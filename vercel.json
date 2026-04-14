@@ -6,7 +6,7 @@
     }
   },
   "routes": [
-    { "src": "^/api/pipsend(.*)", "dest": "/api/pipsend$1" },
+    { "src": "^/api/pipsend(.*)", "dest": "/api/pipsend" },
     { "src": "^/$",           "dest": "/fxte.html"     },
     { "src": "^/fxte/?$",     "dest": "/fxte.html"     },
     { "src": "^/overview/?$", "dest": "/overview.html" },
