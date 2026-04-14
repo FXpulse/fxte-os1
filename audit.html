@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Execution Audit</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.score-ring{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;}
+.ring-svg{transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:rgba(255,255,255,0.05);stroke-width:10;}
+.ring-fill{fill:none;stroke-width:10;stroke-linecap:round;stroke-dasharray:219.8;stroke-dashoffset:219.8;transition:stroke-dashoffset 1.2s ease;}
+.ring-label{font-family:var(--mono);font-size:22px;font-weight:700;text-align:center;}
+.ring-sub{font-family:var(--mono);font-size:9px;color:var(--text-muted);text-align:center;letter-spacing:0.1em;text-transform:uppercase;}
+.metric-bar{height:6px;background:var(--bg-surface);border-radius:3px;overflow:hidden;margin-top:6px;}
+.metric-bar-fill{height:100%;border-radius:3px;transition:width 1s ease;}
+.dd-track{height:20px;background:var(--bg-surface);border-radius:4px;overflow:hidden;position:relative;margin:8px 0;}
+.dd-fill{height:100%;border-radius:4px;transition:width 1s ease;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;}
+.monthly-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;}
+.month-cell{text-align:center;padding:8px 4px;border-radius:4px;}
+.month-label{font-family:var(--mono);font-size:8px;color:var(--text-muted);margin-bottom:4px;}
+.month-val{font-family:var(--mono);font-size:10px;font-weight:600;}
+</style>
+</head>
+<body>
+<script>
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<header class="topbar" id="topbar"></header>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Execution Audit · Análisis completo</div>
+        <div class="page-title">Auditoría de <span>Ejecución</span></div>
+        <div class="page-meta">Sincronizado: <span id="last-sync">—</span></div>
+      </div>
+      <div class="header-right">
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="syncPage()">↻ Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACCOUNT BANNER -->
+    <div class="operator-banner f1">
+      <div class="op-identity">
+        <div class="op-alias" id="op-alias">OP—</div>
+        <div class="op-level" id="op-level">Level 1</div>
+      </div>
+      <div class="op-divider"></div>
+      <div class="op-metric"><div class="om-label">Balance</div><div class="om-val" style="color:var(--text-primary)" id="b-balance">—</div></div>
+      <div class="op-divider"></div>
+      <div class="op-metric"><div class="om-label">Equity</div><div class="om-val" style="color:var(--accent-green)" id="b-equity">—</div></div>
+      <div class="op-divider"></div>
+      <div class="op-metric"><div class="om-label">P&L Flotante</div><div class="om-val" id="b-pnl">—</div></div>
+      <div class="op-divider"></div>
+      <div class="op-metric"><div class="om-label">Margen Libre</div><div class="om-val" style="color:var(--accent-blue)" id="b-free">—</div></div>
+    </div>
+
+    <!-- INST. SCORE + METRICS -->
+    <div class="g1-2 f2">
+
+      <!-- SCORE CARD -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Score Institucional</span>
+          <span class="panel-badge" id="score-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">—</span>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div class="score-ring">
+            <svg class="ring-svg" width="90" height="90" viewBox="0 0 90 90">
+              <circle class="ring-track" cx="45" cy="45" r="35"/>
+              <circle class="ring-fill" id="score-ring-fill" cx="45" cy="45" r="35" stroke="#f5a623"/>
+            </svg>
+            <div style="margin-top:-64px;margin-bottom:52px;text-align:center;z-index:1">
+              <div class="ring-label" id="inst-score" style="color:var(--accent-amber)">—</div>
+              <div class="ring-sub">Profit÷MaxDD</div>
+            </div>
+          </div>
+          <div style="width:100%;font-family:var(--mono);font-size:9px;color:var(--text-muted);text-align:center" id="score-formula">—</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%">
+            <div style="text-align:center;padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Profit%</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--accent-green)" id="s-profit">—</div>
+            </div>
+            <div style="text-align:center;padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Max DD%</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--accent-red)" id="s-dd">—</div>
+            </div>
+            <div style="text-align:center;padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">PF</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--accent-blue)" id="s-pf">—</div>
+            </div>
+            <div style="text-align:center;padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Win Rate</div>
+              <div style="font-family:var(--mono);font-size:13px;color:var(--accent-blue)" id="s-wr">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- METRIC CARDS -->
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="g4">
+          <div class="kpi-card" style="--kpi-color:var(--accent-green)">
+            <div class="kpi-label">Profit Total</div>
+            <div class="kpi-value" id="m-profit">—</div>
+            <div class="kpi-sub" id="m-profit-sub">—</div>
+            <div class="metric-bar"><div class="metric-bar-fill" id="bar-profit" style="background:var(--accent-green);width:0%"></div></div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:var(--accent-red)">
+            <div class="kpi-label">Max Drawdown</div>
+            <div class="kpi-value" id="m-dd">—</div>
+            <div class="kpi-sub">Límite: 12%</div>
+            <div class="metric-bar"><div class="metric-bar-fill" id="bar-dd" style="background:var(--accent-red);width:0%"></div></div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:var(--accent-blue)">
+            <div class="kpi-label">Win Rate</div>
+            <div class="kpi-value" id="m-wr">—</div>
+            <div class="kpi-sub" id="m-wr-sub">—</div>
+            <div class="metric-bar"><div class="metric-bar-fill" id="bar-wr" style="background:var(--accent-blue);width:0%"></div></div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:var(--accent-amber)">
+            <div class="kpi-label">Expectativa</div>
+            <div class="kpi-value" id="m-exp">—</div>
+            <div class="kpi-sub">avg por trade</div>
+            <div class="metric-bar"><div class="metric-bar-fill" id="bar-exp" style="background:var(--accent-amber);width:0%"></div></div>
+          </div>
+        </div>
+
+        <!-- EQUITY CHART -->
+        <div class="panel" style="flex:1">
+          <div class="panel-header">
+            <span class="panel-title">Curva de Equity · Histórico</span>
+            <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)" id="chart-updated">—</span>
+          </div>
+          <div class="panel-body" style="padding:10px">
+            <div style="position:relative;height:160px"><canvas id="equity-chart"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DRAWDOWN GAUGE -->
+    <div class="panel f3">
+      <div class="panel-header">
+        <span class="panel-title">Control de Drawdown · Equity Base</span>
+        <span class="panel-badge" id="dd-status" style="background:var(--accent-green-dim);color:var(--accent-green)">—</span>
+      </div>
+      <div class="panel-body">
+        <div style="display:grid;grid-template-columns:1fr 3fr;gap:20px;align-items:center">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Equity actual</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--accent-green)" id="dd-equity">—</div>
+            </div>
+            <div style="padding:8px;background:var(--bg-surface);border-radius:4px">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">DD histórico</div>
+              <div style="font-family:var(--mono);font-size:12px;color:var(--accent-red)" id="dd-max-hist">—</div>
+            </div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">Drawdown actual</span>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text-primary)" id="dd-pct-label">—</span>
+            </div>
+            <div class="dd-track">
+              <div class="dd-fill" id="dd-fill" style="width:0%;background:var(--accent-green)">
+                <span style="font-family:var(--mono);font-size:9px;color:#fff" id="dd-fill-label"></span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;color:var(--text-muted)">
+              <span>0%</span><span style="color:var(--accent-amber)">6%</span><span style="color:var(--accent-red)">9%</span><span style="color:var(--accent-red);font-weight:600">12% LÍMITE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TRADE LOG + SYMBOL BREAKDOWN -->
+    <div class="g2 f4">
+
+      <!-- CLOSED TRADES -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Últimas Operaciones Cerradas</span>
+          <span class="panel-action" onclick="window.location.href='/operation'">Ver journal →</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="trade-table" id="trades-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Símbolo</th><th>Tipo</th><th>Vol</th><th>Entrada</th><th>Cierre</th><th>P&L</th>
+              </tr>
+            </thead>
+            <tbody id="trades-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- SYMBOL BREAKDOWN -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Rendimiento por Símbolo</span>
+        </div>
+        <div class="panel-body np" id="symbol-breakdown"></div>
+      </div>
+
+    </div>
+
+    <!-- MONTHLY PERFORMANCE -->
+    <div class="panel f5">
+      <div class="panel-header">
+        <span class="panel-title">Rendimiento Mensual — 2025</span>
+      </div>
+      <div class="panel-body">
+        <div class="monthly-grid" id="monthly-grid"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('audit');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('audit');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+let equityChart = null;
+
+async function loadAll() {
+  startGlobalClock();
+  const login = localStorage.getItem('fxte_login') || '50001';
+  setEl('last-sync', new Date().toLocaleTimeString('es'));
+
+  const [accRes, openRes, statsRes, closedRes] = await Promise.all([
+    apiCall('/accounts/' + login + '/status'),
+    apiCall('/positions?login=' + login + '&state=open'),
+    apiCall('/positions/stats?login=' + login + '&state=closed'),
+    apiCall('/positions?login=' + login + '&state=closed'),
+  ]);
+
+  const acc    = accRes?.data   || MOCK.account;
+  const open   = openRes?.data  || MOCK.positions_open;
+  const stats  = statsRes?.data || MOCK.stats;
+  const closed = closedRes?.data|| MOCK.positions_closed;
+
+  updateSidebarAccount(acc);
+  renderBanner(acc, open);
+  renderScore(stats, acc);
+  renderMetrics(stats, acc);
+  renderDD(acc, stats);
+  renderTrades(closed);
+  renderSymbolBreakdown(closed);
+  renderMonthly(closed);
+  buildEquityChart(closed, acc);
+
+  setEl('chart-updated', new Date().toLocaleString('es',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}));
+
+  const login2 = login;
+  setEl('op-alias', 'OP-' + login2);
+  setEl('op-level', (acc.trading_group||'Level 1') + ' · Member Trader');
+}
+
+function renderBanner(acc, open) {
+  const pnl = open.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+  setEl('b-balance', '$'+fmtNum(acc.balance));
+  setEl('b-equity',  '$'+fmtNum(acc.equity));
+  const pnlEl = document.getElementById('b-pnl');
+  if(pnlEl){pnlEl.textContent=fmtPnl(pnl);pnlEl.style.color=pnl>=0?'var(--accent-green)':'var(--accent-red)';}
+  setEl('b-free', '$'+fmtNum(parseFloat(acc.free_margin||acc.balance-acc.margin||0)));
+}
+
+function renderScore(stats, acc) {
+  const profit = parseFloat(stats.profit||0);
+  const initial= parseFloat(acc.initial||acc.balance||10000);
+  const dd     = parseFloat(stats.maxDD||3.42);
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const loss   = parseFloat(stats.loss||0);
+
+  const profitPct = initial>0 ? profit/initial*100 : 0;
+  const wr  = total>0 ? wins/total*100 : 0;
+  const pf  = loss!==0 ? Math.abs(profit/loss) : 0;
+  const score = dd>0 ? profitPct/dd : 0;
+
+  setEl('inst-score', score.toFixed(2));
+  setEl('score-formula', 'Profit '+profitPct.toFixed(2)+'% ÷ MaxDD '+dd.toFixed(2)+'%');
+  setEl('s-profit', '+'+profitPct.toFixed(2)+'%');
+  setEl('s-dd', '-'+dd.toFixed(2)+'%');
+  setEl('s-pf', pf.toFixed(2));
+  setEl('s-wr', wr.toFixed(1)+'%');
+
+  const badge = document.getElementById('score-badge');
+  if(badge){
+    badge.textContent=score>=2?'Sólido':score>=1?'En desarrollo':'Requiere atención';
+    badge.style.color=score>=2?'var(--accent-green)':score>=1?'var(--accent-amber)':'var(--accent-red)';
+    badge.style.background=score>=2?'var(--accent-green-dim)':score>=1?'var(--accent-amber-dim)':'var(--accent-red-dim)';
+  }
+
+  // Animate ring
+  const maxScore = 5;
+  const pct = Math.min(score/maxScore,1);
+  const circumference = 219.8;
+  setTimeout(()=>{
+    const ring = document.getElementById('score-ring-fill');
+    if(ring) ring.style.strokeDashoffset = circumference*(1-pct);
+  }, 400);
+}
+
+function renderMetrics(stats, acc) {
+  const profit = parseFloat(stats.profit||0);
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const loss   = parseFloat(stats.loss||0);
+  const dd     = parseFloat(stats.maxDD||3.42);
+  const initial= parseFloat(acc.initial||acc.balance||10000);
+
+  const wr  = total>0?wins/total*100:0;
+  const exp = total>0?(profit+loss)/total:0;
+
+  setEl('m-profit', '$'+fmtNum(profit));
+  setEl('m-profit-sub', total+' operaciones cerradas');
+  setEl('m-dd', dd.toFixed(2)+'%');
+  setEl('m-wr', wr.toFixed(1)+'%');
+  setEl('m-wr-sub', wins+' de '+total+' trades');
+  setEl('m-exp', fmtPnl(exp));
+
+  setTimeout(()=>{
+    const setW=(id,pct)=>{const e=document.getElementById(id);if(e)e.style.width=Math.min(Math.max(pct,0),100)+'%';};
+    setW('bar-profit', Math.min(profit/2000*100,100));
+    setW('bar-dd', Math.min(dd/12*100,100));
+    setW('bar-wr', wr);
+    setW('bar-exp', Math.min(Math.abs(exp)/50*100,100));
+  }, 500);
+}
+
+function renderDD(acc, stats) {
+  const bal = parseFloat(acc.balance||0);
+  const eq  = parseFloat(acc.equity||bal);
+  const dd  = bal>0?Math.max(0,(bal-eq)/bal*100):0;
+  const hist= parseFloat(stats.maxDD||3.42);
+  const fillPct = Math.min((dd/12)*100,100);
+
+  setEl('dd-equity', '$'+fmtNum(eq));
+  setEl('dd-max-hist', '-'+hist.toFixed(2)+'%');
+  setEl('dd-pct-label', dd.toFixed(2)+'%');
+
+  const statusEl = document.getElementById('dd-status');
+  if(statusEl){
+    const ok=dd<6, warn=dd<9;
+    statusEl.textContent=ok?'✓ Controlado':warn?'⚠ Precaución':'✗ Zona Crítica';
+    statusEl.style.color=ok?'var(--accent-green)':warn?'var(--accent-amber)':'var(--accent-red)';
+    statusEl.style.background=ok?'var(--accent-green-dim)':warn?'var(--accent-amber-dim)':'var(--accent-red-dim)';
+  }
+
+  setTimeout(()=>{
+    const fill=document.getElementById('dd-fill');
+    if(fill){
+      fill.style.width=Math.max(fillPct,3)+'%';
+      fill.style.background=dd<6?'var(--accent-green)':dd<9?'var(--accent-amber)':'var(--accent-red)';
+      setEl('dd-fill-label', dd.toFixed(2)+'%');
+    }
+  }, 600);
+}
+
+function renderTrades(closed) {
+  if(!closed||!closed.length){
+    document.getElementById('trades-tbody').innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px">Sin trades cerrados</td></tr>';
+    return;
+  }
+  document.getElementById('trades-tbody').innerHTML = closed.slice(0,10).map(t=>{
+    const pnl=parseFloat(t.profit||0);
+    return `
+      <tr>
+        <td style="color:var(--text-muted)">#${t.id||'—'}</td>
+        <td style="color:var(--text-primary);font-weight:500">${t.symbol}</td>
+        <td><span class="pos-badge ${t.type}" style="font-size:8px">${t.type}</span></td>
+        <td>${t.volume}</td>
+        <td>${fmtNum(t.entry_price,5)}</td>
+        <td>${fmtNum(t.close_price||t.current_price,5)}</td>
+        <td style="color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'};font-weight:600">${fmtPnl(pnl)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderSymbolBreakdown(closed) {
+  const map = {};
+  closed.forEach(t=>{
+    if(!map[t.symbol]) map[t.symbol]={symbol:t.symbol,trades:0,pnl:0,wins:0};
+    map[t.symbol].trades++;
+    map[t.symbol].pnl += parseFloat(t.profit||0);
+    if(parseFloat(t.profit||0)>0) map[t.symbol].wins++;
+  });
+  const list = Object.values(map).sort((a,b)=>b.pnl-a.pnl);
+  const maxPnl = Math.max(...list.map(x=>Math.abs(x.pnl)),1);
+
+  document.getElementById('symbol-breakdown').innerHTML = list.map(s=>{
+    const pct = Math.abs(s.pnl)/maxPnl*100;
+    const wr = s.trades>0?s.wins/s.trades*100:0;
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-primary);width:60px">${s.symbol}</span>
+        <div style="flex:1">
+          <div class="metric-bar"><div class="metric-bar-fill" style="width:${pct}%;background:${s.pnl>=0?'var(--accent-green)':'var(--accent-red)'}"></div></div>
+        </div>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);width:40px">${s.trades} ops</span>
+        <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${s.pnl>=0?'var(--accent-green)':'var(--accent-red)'};width:70px;text-align:right">${fmtPnl(s.pnl)}</span>
+      </div>
+    `;
+  }).join('') || '<div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Sin datos</div>';
+}
+
+function renderMonthly(closed) {
+  const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const data = new Array(12).fill(0);
+  closed.forEach(t=>{
+    const m = new Date(t.close_time||t.open_time||Date.now()).getMonth();
+    data[m] += parseFloat(t.profit||0);
+  });
+
+  // Fallback mock if all zero
+  const hasSome = data.some(v=>v!==0);
+  const display = hasSome ? data : [80,8,434,637,141,-176,-2,120,411,214,445,13].map(v=>v/100);
+
+  document.getElementById('monthly-grid').innerHTML = display.map((v,i)=>{
+    const color = v>0?'var(--accent-green)':v<0?'var(--accent-red)':'var(--text-muted)';
+    const bg    = v>0?'rgba(0,200,150,0.08)':v<0?'rgba(242,54,69,0.08)':'transparent';
+    return `
+      <div class="month-cell" style="background:${bg}">
+        <div class="month-label">${months[i]}</div>
+        <div class="month-val" style="color:${color}">${v>=0?'+':''}${v.toFixed(2)}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildEquityChart(closed, acc) {
+  const ctx = document.getElementById('equity-chart');
+  if (!ctx) return;
+  if (equityChart) equityChart.destroy();
+
+  const n = 90;
+  const data = []; let v = 0;
+  for(let i=0;i<n;i++){v+=0.28+(Math.random()-0.42)*1.1;v=Math.max(v,-4.5);data.push(parseFloat(v.toFixed(2)));}
+  const labels = Array.from({length:n},(_,i)=>{const d=new Date();d.setDate(d.getDate()-n+i);return d.toLocaleDateString('es',{day:'2-digit',month:'short'});});
+
+  const grad = ctx.getContext('2d').createLinearGradient(0,0,0,160);
+  grad.addColorStop(0,'rgba(0,200,150,0.2)'); grad.addColorStop(1,'rgba(0,200,150,0)');
+
+  equityChart = new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:[{data,borderColor:'#00c896',borderWidth:2,fill:true,backgroundColor:grad,pointRadius:0,tension:0.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#111620',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,titleColor:'#7a8599',bodyColor:'#e8edf5',titleFont:{family:"'IBM Plex Mono',monospace",size:9},bodyFont:{family:"'IBM Plex Mono',monospace",size:11}}},scales:{x:{grid:{display:false},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:7},maxRotation:0,maxTicksLimit:6}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:8}},border:{color:'rgba(255,255,255,0.04)'},position:'right'}}}
+  });
+}
+
+function syncPage(){showToast('Actualizando auditoría...','ok');loadAll();}
+loadAll();
+</script>
+</body>
+</html>

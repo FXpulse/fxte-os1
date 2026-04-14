@@ -1,0 +1,47 @@
+Options -Indexes
+RewriteEngine On
+
+# Remove trailing slash (except root)
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.+)/$ /$1 [L,R=301]
+
+# If file exists, serve it directly
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Route /fxte → fxte.html
+RewriteRule ^fxte/?$ /fxte.html [L]
+
+# Route /overview → overview.html
+RewriteRule ^overview/?$ /overview.html [L]
+
+# Route /audit → audit.html
+RewriteRule ^audit/?$ /audit.html [L]
+
+# Route /ranking → ranking.html
+RewriteRule ^ranking/?$ /ranking.html [L]
+
+# Route /symbol → symbol.html
+RewriteRule ^symbol/?$ /symbol.html [L]
+
+# Route /market → market.html
+RewriteRule ^market/?$ /market.html [L]
+
+# Route /operation → operation.html
+RewriteRule ^operation/?$ /operation.html [L]
+
+# Route /alert → alert.html
+RewriteRule ^alert/?$ /alert.html [L]
+
+# Redirect root to login
+RewriteRule ^$ /fxte.html [L]
+
+# CORS for API calls (adjust origin as needed)
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"
+Header set Access-Control-Allow-Headers "Authorization, Content-Type"
+
+# Cache shared.js
+<FilesMatch "shared\.js$">
+  Header set Cache-Control "max-age=3600"
+</FilesMatch>

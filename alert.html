@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Alerts & Progression</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.alert-card{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--alert-color,var(--border-active));transition:all 0.15s;}
+.alert-card:hover{background:var(--bg-card-hover);}
+.alert-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.alert-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.alert-title{font-family:var(--mono);font-size:11px;font-weight:600;flex:1;}
+.alert-timestamp{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.alert-body{font-family:var(--sans);font-size:12px;color:var(--text-secondary);line-height:1.5;margin-left:38px;}
+.alert-action{font-family:var(--mono);font-size:9px;letter-spacing:0.08em;margin-left:38px;margin-top:6px;text-transform:uppercase;}
+/* LEVEL CARDS */
+.level-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.level-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.level-name{font-family:var(--mono);font-size:13px;font-weight:700;}
+.level-badge{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;}
+.level-body{padding:16px 18px;}
+.crit-row{display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+.crit-row:last-child{border-bottom:none;}
+.crit-check{width:16px;height:16px;border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;margin-top:1px;}
+.crit-text-wrap{flex:1;}
+.crit-name{font-family:var(--mono);font-size:10px;color:var(--text-primary);}
+.crit-desc{font-family:var(--sans);font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4;}
+.crit-val{font-family:var(--mono);font-size:10px;margin-left:auto;padding-left:8px;white-space:nowrap;}
+/* PROGRESS PATH */
+.prog-path{display:flex;align-items:center;gap:0;margin-bottom:24px;overflow-x:auto;padding-bottom:4px;}
+.path-node{flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.path-circle{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;font-weight:700;border:2px solid var(--border-active);background:var(--bg-card);position:relative;z-index:1;}
+.path-circle.done{background:var(--accent-green-dim);border-color:var(--accent-green);color:var(--accent-green);}
+.path-circle.active{background:var(--accent-amber-dim);border-color:var(--accent-amber);color:var(--accent-amber);box-shadow:0 0 12px rgba(245,166,35,0.3);}
+.path-circle.locked{color:var(--text-muted);}
+.path-label{font-family:var(--mono);font-size:8px;color:var(--text-muted);text-align:center;width:50px;}
+.path-connector{flex:1;height:2px;background:var(--border);min-width:20px;margin-bottom:16px;}
+.path-connector.done{background:var(--accent-green);}
+/* SCORE HISTORY */
+.score-hist-wrap{position:relative;height:100px;}
+</style>
+</head>
+<body>
+<script>
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<header class="topbar" id="topbar"></header>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Alerts & Progression · Control de riesgo</div>
+        <div class="page-title">Alertas y <span>Progresión</span></div>
+        <div class="page-meta" id="alert-meta">Calculando alertas activas...</div>
+      </div>
+      <div class="header-right">
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="clearAlerts()">✓ Marcar leídas</button>
+          <button class="btn primary" onclick="syncPage()">↻ Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALERT SUMMARY BANNER -->
+    <div class="g4 f1">
+      <div class="kpi-card" style="--kpi-color:var(--accent-red)">
+        <div class="kpi-label">Alertas Críticas</div>
+        <div class="kpi-value" id="a-critical">—</div>
+        <div class="kpi-sub">Acción requerida</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-amber)">
+        <div class="kpi-label">Alertas Activas</div>
+        <div class="kpi-value" id="a-active">—</div>
+        <div class="kpi-sub">En monitoreo</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-green)">
+        <div class="kpi-label">Estado General</div>
+        <div class="kpi-value" id="a-status">—</div>
+        <div class="kpi-sub" id="a-status-sub">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-blue)">
+        <div class="kpi-label">Progresión</div>
+        <div class="kpi-value" id="a-progress">—</div>
+        <div class="kpi-sub" id="a-progress-sub">—</div>
+      </div>
+    </div>
+
+    <!-- ALERTS + SCORE HISTORY -->
+    <div class="g2l f2">
+
+      <!-- ALERTS FEED -->
+      <div>
+        <div style="font-family:var(--mono);font-size:9px;letter-spacing:0.2em;color:var(--text-muted);text-transform:uppercase;margin-bottom:10px">Alertas en tiempo real</div>
+        <div id="alerts-feed"></div>
+      </div>
+
+      <!-- SCORE TREND -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Historial de Score Inst.</span>
+          </div>
+          <div class="panel-body">
+            <div class="score-hist-wrap"><canvas id="score-hist-chart"></canvas></div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px">
+              <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">Score actual</span>
+              <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent-amber)" id="score-current">—</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MICRO METRICS -->
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Métricas de Riesgo</span></div>
+          <div class="panel-body np" id="risk-metrics"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PROGRESSION PATH -->
+    <div class="panel f3">
+      <div class="panel-header">
+        <span class="panel-title">Ruta de Progresión FXTE PRO</span>
+        <span class="panel-action" id="prog-status-badge" style="color:var(--accent-amber)">En progreso</span>
+      </div>
+      <div class="panel-body" style="padding:20px">
+        <div class="prog-path" id="prog-path"></div>
+        <div id="prog-note" style="font-family:var(--sans);font-size:12px;color:var(--text-secondary);text-align:center;margin-top:4px;line-height:1.5"></div>
+      </div>
+    </div>
+
+    <!-- LEVEL CARDS -->
+    <div class="g2 f4">
+
+      <!-- LEVEL 1 -->
+      <div class="level-card">
+        <div class="level-header">
+          <div>
+            <div class="level-name" style="color:var(--accent-blue)">Level 1 · Member Trader</div>
+            <div style="font-family:var(--sans);font-size:11px;color:var(--text-muted);margin-top:2px">Cuenta estándar FXTE PRO · Capital base</div>
+          </div>
+          <span class="level-badge" id="l1-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">ACTIVO</span>
+        </div>
+        <div class="level-body" id="l1-criteria"></div>
+      </div>
+
+      <!-- LEVEL 2 -->
+      <div class="level-card">
+        <div class="level-header">
+          <div>
+            <div class="level-name" style="color:var(--accent-amber)">Level 2 · Pro Operator</div>
+            <div style="font-family:var(--sans);font-size:11px;color:var(--text-muted);margin-top:2px">Capital 2x · Acceso a mayores lotes</div>
+          </div>
+          <span class="level-badge" id="l2-badge" style="background:var(--accent-amber-dim);color:var(--accent-amber)">OBJETIVO</span>
+        </div>
+        <div class="level-body" id="l2-criteria"></div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('alert');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('alert');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+let scoreChart = null;
+
+async function loadAll() {
+  startGlobalClock();
+  const login = localStorage.getItem('fxte_login') || '50001';
+
+  const [accRes, openRes, statsRes] = await Promise.all([
+    apiCall('/accounts/'+login+'/status'),
+    apiCall('/positions?login='+login+'&state=open'),
+    apiCall('/positions/stats?login='+login+'&state=closed'),
+  ]);
+
+  const acc   = accRes?.data   || MOCK.account;
+  const open  = openRes?.data  || MOCK.positions_open;
+  const stats = statsRes?.data || MOCK.stats;
+
+  updateSidebarAccount(acc);
+  renderAlerts(acc, open, stats);
+  renderSummary(acc, open, stats);
+  renderProgressPath(acc, stats);
+  renderLevel1Criteria(acc, stats);
+  renderLevel2Criteria(acc, stats);
+  renderRiskMetrics(acc, open, stats);
+  buildScoreChart(stats, acc);
+
+  setEl('alert-meta', 'Login ' + login + ' · Actualizado: ' + new Date().toLocaleTimeString('es'));
+
+  connectWebSocket(msg => {
+    if(msg.op==='accounts:balance'&&msg.data) { updateSidebarAccount(msg.data); }
+    if(msg.op==='positions:updated'&&msg.data) { renderAlerts(acc, msg.data, stats); }
+  });
+}
+
+function renderAlerts(acc, open, stats) {
+  const bal = parseFloat(acc.balance||0);
+  const eq  = parseFloat(acc.equity||bal);
+  const dd  = bal>0?Math.max(0,(bal-eq)/bal*100):0;
+  const ddHist = parseFloat(stats.maxDD||dd||3.42);
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const profit = parseFloat(stats.profit||0);
+  const loss   = parseFloat(stats.loss||0);
+  const wr     = total>0?wins/total*100:0;
+  const pf     = loss!==0?Math.abs(profit/loss):0;
+  const openPnl= open.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+
+  const alerts = [];
+
+  // DD alerts
+  if (ddHist > 10) {
+    alerts.push({level:'critical',color:'var(--accent-red)',icon:'⚠',title:'Drawdown Crítico — '+ddHist.toFixed(2)+'%',body:'Tu drawdown máximo supera el 10%. Zona de riesgo alto. Reduz tamaño de posiciones inmediatamente.',action:'Ver control de DD →', link:'/audit'});
+  } else if (ddHist > 7) {
+    alerts.push({level:'warn',color:'var(--accent-amber)',icon:'!',title:'Drawdown Elevado — '+ddHist.toFixed(2)+'%',body:'Tu drawdown máximo se acerca al límite del 12%. Evalúa reducir exposición.',action:'Ver auditoría →', link:'/audit'});
+  } else {
+    alerts.push({level:'ok',color:'var(--accent-green)',icon:'✓',title:'Drawdown Controlado — '+ddHist.toFixed(2)+'%',body:'Excelente gestión de riesgo. DD dentro del rango óptimo (< 6%).',action:null});
+  }
+
+  // P&L flotante
+  if (openPnl < -300) {
+    alerts.push({level:'warn',color:'var(--accent-amber)',icon:'!',title:'Pérdida Flotante Significativa',body:'P&L flotante acumulado: ' + fmtPnl(openPnl) + '. Revisa tus posiciones abiertas.',action:'Ver posiciones →',link:'/operation'});
+  }
+
+  // Win rate
+  if (total >= 10 && wr < 45) {
+    alerts.push({level:'warn',color:'var(--accent-amber)',icon:'◐',title:'Win Rate Bajo — '+wr.toFixed(1)+'%',body:'Tu tasa de acierto está por debajo del 45%. Revisa tus setups y criterios de entrada.',action:null});
+  }
+
+  // Profit factor
+  if (total >= 10 && pf < 1) {
+    alerts.push({level:'critical',color:'var(--accent-red)',icon:'▼',title:'Profit Factor < 1.0',body:'El sistema pierde más de lo que gana. Profit Factor: '+pf.toFixed(2)+'. Requiere revisión urgente de la estrategia.',action:'Ver auditoría →',link:'/audit'});
+  }
+
+  // Macro upcoming
+  alerts.push({level:'info',color:'var(--accent-blue)',icon:'◈',title:'Evento Macro en 2h — IPC EEUU',body:'El IPC mensual de EEUU se publica a las 08:30 UTC. Alto impacto esperado en USD, XAU y índices.',action:'Ver calendario →',link:'/market'});
+
+  // Open positions count
+  if (open.length >= 3) {
+    alerts.push({level:'info',color:'var(--accent-blue)',icon:'◎',title:open.length+' posiciones abiertas simultáneas',body:'Tienes '+open.length+' trades abiertos. Revisa el riesgo total acumulado antes de abrir nuevas posiciones.',action:'Ver journal →',link:'/operation'});
+  }
+
+  // Render
+  const critical = alerts.filter(a=>a.level==='critical').length;
+  const active   = alerts.filter(a=>a.level!=='ok').length;
+
+  setEl('a-critical', critical);
+  setEl('a-active', active);
+  setEl('a-status', critical>0?'RIESGO':active>0?'ATENCIÓN':'OK');
+  document.getElementById('a-status').style.color = critical>0?'var(--accent-red)':active>0?'var(--accent-amber)':'var(--accent-green)';
+  setEl('a-status-sub', critical>0?'Acción inmediata':active>0?'Monitorear':'Sistema en orden');
+
+  const feed = document.getElementById('alerts-feed');
+  feed.innerHTML = alerts.map(a => `
+    <div class="alert-card" style="--alert-color:${a.color}">
+      <div class="alert-header">
+        <div class="alert-icon" style="background:${a.color}22;color:${a.color}">${a.icon}</div>
+        <span class="alert-title" style="color:${a.color}">${a.title}</span>
+        <span class="alert-timestamp">Ahora</span>
+      </div>
+      <div class="alert-body">${a.body}</div>
+      ${a.action?`<div class="alert-action"><a href="${a.link||'#'}" style="color:${a.color};text-decoration:none">${a.action}</a></div>`:''}
+    </div>
+  `).join('');
+
+  // Update sidebar badge
+  const sideBadge = document.getElementById('sb-alert-count');
+  if (sideBadge) sideBadge.textContent = critical+active;
+
+  setEl('alert-meta', critical+' críticas · '+active+' activas · '+alerts.length+' total');
+}
+
+function renderSummary(acc, open, stats) {
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const wr     = total>0?wins/total*100:0;
+  const profit = parseFloat(stats.profit||0);
+  const loss   = parseFloat(stats.loss||0);
+  const initial= parseFloat(acc.initial||acc.balance||10000);
+  const pnlPct = initial>0?profit/initial*100:0;
+  const ddHist = parseFloat(stats.maxDD||3.42);
+  const score  = ddHist>0?pnlPct/ddHist:0;
+
+  const months = Math.min(Math.floor(total/10),4);
+  const progPct= Math.round((months/4)*60+(wr>=50?20:0)+(ddHist<12?20:0));
+
+  setEl('a-progress', progPct+'%');
+  setEl('a-progress-sub', months>0?months+' mes(es) completado(s)':'En curso, mes 1');
+}
+
+function renderProgressPath(acc, stats) {
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const wr     = total>0?wins/total*100:0;
+  const ddHist = parseFloat(stats.maxDD||3.42);
+  const months = Math.min(Math.floor(total/10),4);
+
+  const nodes = [
+    {label:'Ingreso\nLevel 1', done:true,  active:false},
+    {label:'Mes 1\n+Profit',   done:months>=1, active:months===0},
+    {label:'Mes 2\n+Profit',   done:months>=2, active:months===1},
+    {label:'Mes 3\n+Profit',   done:months>=3, active:months===2},
+    {label:'Mes 4\n+Profit',   done:months>=4, active:months===3},
+    {label:'Level 2\nPro',     done:false, active:false},
+  ];
+
+  let html = '';
+  nodes.forEach((n,i) => {
+    const cls = n.done?'done':n.active?'active':'locked';
+    html += `<div class="path-node"><div class="path-circle ${cls}">${n.done?'✓':n.active?'→':(i+1)}</div><div class="path-label">${n.label}</div></div>`;
+    if(i<nodes.length-1) html+=`<div class="path-connector ${n.done?'done':''}"></div>`;
+  });
+  document.getElementById('prog-path').innerHTML = html;
+
+  const note = months>=4&&wr>=50&&ddHist<12 ?
+    '🎉 ¡Criterios completados! Contacta a tu manager para la evaluación de Level 2.' :
+    'Sigue operando con disciplina. '+(4-months)+' meses restantes para completar la evaluación.';
+  setEl('prog-note', note);
+}
+
+function renderLevel1Criteria(acc, stats) {
+  const ddHist = parseFloat(stats.maxDD||3.42);
+  const profit = parseFloat(stats.profit||0);
+  const initial = parseFloat(acc.initial||acc.balance||10000);
+  const wr = stats.total>0?stats.wins/stats.total*100:0;
+
+  const criteria = [
+    { name:'DD máximo < 12%',    desc:'Límite de pérdida sobre equity base',           done:ddHist<12,  val:ddHist.toFixed(2)+'% actual' },
+    { name:'Al menos 1 mes positivo', desc:'Mes cerrado con rentabilidad neta > 0',   done:profit>0,   val:profit>0?'Mes 1 ✓':'Pendiente' },
+    { name:'Win Rate > 45%',     desc:'Sobre todas las operaciones del período',       done:wr>=45,     val:wr.toFixed(1)+'% actual' },
+    { name:'Min. 10 operaciones', desc:'Muestra estadística representativa',           done:stats.total>=10, val:(stats.total||0)+' trades' },
+  ];
+  renderCriteria('l1-criteria', criteria);
+}
+
+function renderLevel2Criteria(acc, stats) {
+  const ddHist = parseFloat(stats.maxDD||3.42);
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const profit = parseFloat(stats.profit||0);
+  const initial= parseFloat(acc.initial||acc.balance||10000);
+  const wr     = total>0?wins/total*100:0;
+  const pnlPct = initial>0?profit/initial*100:0;
+  const months = Math.floor(total/10);
+  const pf     = stats.loss?Math.abs(profit/parseFloat(stats.loss)):0;
+
+  const criteria = [
+    { name:'4 meses consecutivos positivos', desc:'Sin un mes negativo en el período de evaluación', done:months>=4, val:months+' / 4 meses' },
+    { name:'DD máximo < 12%',    desc:'Durante todo el período Level 1',               done:ddHist<12, val:ddHist.toFixed(2)+'%' },
+    { name:'Win Rate ≥ 50%',     desc:'Consistencia mínima requerida',                done:wr>=50,    val:wr.toFixed(1)+'%' },
+    { name:'P&L > 5%',           desc:'Rentabilidad neta sobre capital base',         done:pnlPct>=5, val:'+'+pnlPct.toFixed(2)+'%' },
+    { name:'Profit Factor ≥ 1.5', desc:'Calidad operativa mínima',                   done:pf>=1.5,   val:pf.toFixed(2) },
+    { name:'Revisión por manager', desc:'Análisis de operaciones por el equipo FXTE', done:false,     val:'Pendiente evaluación' },
+  ];
+  renderCriteria('l2-criteria', criteria);
+}
+
+function renderCriteria(id, criteria) {
+  document.getElementById(id).innerHTML = criteria.map(c => `
+    <div class="crit-row">
+      <div class="crit-check" style="background:${c.done?'var(--accent-green-dim)':'var(--bg-highlight)'};color:${c.done?'var(--accent-green)':'var(--text-muted)'}">${c.done?'✓':'○'}</div>
+      <div class="crit-text-wrap">
+        <div class="crit-name" style="color:${c.done?'var(--text-primary)':'var(--text-secondary)'}">${c.name}</div>
+        <div class="crit-desc">${c.desc}</div>
+      </div>
+      <div class="crit-val" style="color:${c.done?'var(--accent-green)':'var(--text-muted)'}">${c.val}</div>
+    </div>
+  `).join('');
+}
+
+function renderRiskMetrics(acc, open, stats) {
+  const bal  = parseFloat(acc.balance||0);
+  const eq   = parseFloat(acc.equity||bal);
+  const dd   = bal>0?Math.max(0,(bal-eq)/bal*100):0;
+  const ddH  = parseFloat(stats.maxDD||dd||3.42);
+  const free = parseFloat(acc.free_margin||bal-parseFloat(acc.margin||0)||0);
+  const openLots = open.reduce((s,p)=>s+parseFloat(p.volume||0),0);
+  const openPnl  = open.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+  const pf = stats.loss?Math.abs(parseFloat(stats.profit)/parseFloat(stats.loss)):0;
+
+  const metrics = [
+    {label:'DD actual',       val:dd.toFixed(2)+'%',     color:dd<6?'var(--accent-green)':dd<9?'var(--accent-amber)':'var(--accent-red)'},
+    {label:'DD histórico',    val:'-'+ddH.toFixed(2)+'%',color:'var(--accent-red)'},
+    {label:'DD restante',     val: (12-ddH).toFixed(2)+'%',color:'var(--accent-green)'},
+    {label:'Margen libre',    val:'$'+fmtNum(free),       color:'var(--text-primary)'},
+    {label:'Lotes abiertos',  val:openLots.toFixed(2),    color:'var(--accent-blue)'},
+    {label:'P&L flotante',    val:fmtPnl(openPnl),        color:openPnl>=0?'var(--accent-green)':'var(--accent-red)'},
+    {label:'Profit Factor',   val:pf.toFixed(2),          color:pf>=1.5?'var(--accent-green)':pf>=1?'var(--accent-amber)':'var(--accent-red)'},
+    {label:'Margen uso',      val:((parseFloat(acc.margin||0)/bal*100)||0).toFixed(2)+'%', color:'var(--accent-blue)'},
+  ];
+
+  document.getElementById('risk-metrics').innerHTML = metrics.map(m=>`
+    <div style="display:flex;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border)">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">${m.label}</span>
+      <span style="font-family:var(--mono);font-size:10px;font-weight:600;color:${m.color}">${m.val}</span>
+    </div>
+  `).join('');
+}
+
+function buildScoreChart(stats, acc) {
+  const ctx = document.getElementById('score-hist-chart'); if(!ctx) return;
+  if(scoreChart) scoreChart.destroy();
+  const n=15, data=[]; let v=0.8;
+  for(let i=0;i<n;i++){v+=((Math.random()-0.4)*0.3);v=Math.max(0,v);data.push(parseFloat(v.toFixed(2)));}
+
+  const initial=parseFloat(acc.initial||acc.balance||10000);
+  const profit=parseFloat(stats.profit||0);
+  const dd=parseFloat(stats.maxDD||3.42);
+  const score=dd>0?(profit/initial*100)/dd:0;
+  data[data.length-1]=parseFloat(score.toFixed(2));
+  setEl('score-current', score.toFixed(2));
+
+  const grad=ctx.getContext('2d').createLinearGradient(0,0,0,100);
+  grad.addColorStop(0,'rgba(245,166,35,0.25)'); grad.addColorStop(1,'rgba(245,166,35,0)');
+
+  scoreChart=new Chart(ctx,{type:'line',data:{labels:Array.from({length:n},(_,i)=>'S'+(i+1)),datasets:[{data,borderColor:'#f5a623',borderWidth:2,fill:true,backgroundColor:grad,pointRadius:0,tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#111620',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,titleColor:'#7a8599',bodyColor:'#e8edf5',titleFont:{family:"'IBM Plex Mono',monospace",size:9},bodyFont:{family:"'IBM Plex Mono',monospace",size:11}}},scales:{x:{grid:{display:false},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:7}}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:8}},border:{color:'rgba(255,255,255,0.04)'},position:'right'}}}});
+}
+
+function clearAlerts(){showToast('Alertas marcadas como leídas','ok');}
+function syncPage(){showToast('Actualizando alertas...','ok');loadAll();}
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Symbol Desk</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.sym-header{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:16px 20px;margin-bottom:16px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;}
+.sym-name{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--text-primary);}
+.sym-price-big{font-family:var(--mono);font-size:28px;font-weight:700;}
+.sym-change-big{font-family:var(--mono);font-size:14px;font-weight:600;padding:4px 10px;border-radius:4px;}
+.sym-stat{display:flex;flex-direction:column;gap:2px;}
+.sym-stat-label{font-family:var(--mono);font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;}
+.sym-stat-val{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-primary);}
+.sym-selector{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.sym-btn{font-family:var(--mono);font-size:9px;padding:5px 10px;border-radius:4px;border:1px solid var(--border-active);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;transition:all 0.15s;}
+.sym-btn:hover{border-color:var(--accent-blue);color:var(--accent-blue);}
+.sym-btn.active{background:var(--accent-blue-dim);border-color:var(--accent-blue);color:var(--accent-blue);}
+.sym-subnav{display:flex;gap:2px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:0;}
+.sym-tab{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;color:var(--text-secondary);padding:8px 14px;cursor:pointer;border-bottom:2px solid transparent;transition:all 0.15s;text-transform:uppercase;}
+.sym-tab:hover{color:var(--text-primary);}
+.sym-tab.active{color:var(--accent-blue);border-bottom-color:var(--accent-blue);}
+.session-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:3px;font-family:var(--mono);font-size:9px;background:var(--accent-green-dim);color:var(--accent-green);}
+.bias-bar-track{height:10px;background:var(--bg-surface);border-radius:5px;overflow:hidden;display:flex;margin:8px 0;}
+.bias-long{height:100%;background:var(--accent-green);}
+.bias-short{height:100%;background:var(--accent-red);}
+</style>
+</head>
+<body>
+<script>
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<header class="topbar" id="topbar"></header>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Symbol Desk · Análisis por instrumento</div>
+        <div class="page-title">Mesa de <span>Símbolos</span></div>
+      </div>
+      <div class="header-right">
+        <button class="btn" onclick="syncPage()">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <!-- SYMBOL SELECTOR -->
+    <div class="sym-selector f1" id="sym-selector">
+      <!-- populated by JS -->
+    </div>
+
+    <!-- SYMBOL HEADER -->
+    <div class="sym-header f2" id="sym-header">
+      <div>
+        <div class="sym-name" id="h-name">—</div>
+        <div style="font-family:var(--sans);font-size:11px;color:var(--text-muted)" id="h-full">Selecciona un símbolo</div>
+      </div>
+      <div>
+        <div class="sym-price-big" id="h-price">—</div>
+      </div>
+      <div class="sym-change-big" id="h-change">—</div>
+      <div class="sym-stat"><div class="sym-stat-label">Apertura</div><div class="sym-stat-val" id="h-open">—</div></div>
+      <div class="sym-stat"><div class="sym-stat-label">Bid</div><div class="sym-stat-val" id="h-bid">—</div></div>
+      <div class="sym-stat"><div class="sym-stat-label">Ask</div><div class="sym-stat-val" id="h-ask">—</div></div>
+      <div class="sym-stat"><div class="sym-stat-label">Sesión</div><div class="sym-stat-val" id="h-session">—</div></div>
+    </div>
+
+    <!-- TABS -->
+    <div class="sym-subnav f3">
+      <div class="sym-tab active" onclick="switchTab(this,'tab-overview')">Vista General</div>
+      <div class="sym-tab" onclick="switchTab(this,'tab-bias')">Sesgo</div>
+      <div class="sym-tab" onclick="switchTab(this,'tab-exposure')">Mi Exposición</div>
+      <div class="sym-tab" onclick="switchTab(this,'tab-macro')">Contexto Macro</div>
+    </div>
+
+    <!-- TAB: OVERVIEW -->
+    <div id="tab-overview">
+      <div class="g4 f0">
+        <div class="kpi-card" style="--kpi-color:var(--accent-green)">
+          <div class="kpi-label">Precio actual</div>
+          <div class="kpi-value" id="m-price">—</div>
+          <div class="kpi-sub" id="m-change-sub">—</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:var(--accent-blue)">
+          <div class="kpi-label">Rango intradiario</div>
+          <div class="kpi-value" id="m-range">—</div>
+          <div class="kpi-sub" id="m-range-sub">—</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:var(--accent-amber)">
+          <div class="kpi-label">Volatilidad ATR</div>
+          <div class="kpi-value" id="m-atr">—</div>
+          <div class="kpi-sub">14 períodos</div>
+        </div>
+        <div class="kpi-card" style="--kpi-color:var(--accent-red)">
+          <div class="kpi-label">Spread</div>
+          <div class="kpi-value" id="m-spread">—</div>
+          <div class="kpi-sub">pips</div>
+        </div>
+      </div>
+      <div class="panel f1">
+        <div class="panel-header">
+          <span class="panel-title" id="chart-title">Gráfico de Precio</span>
+          <div style="display:flex;gap:4px" id="tf-btns">
+            <span class="sym-btn active" onclick="setTF(this,'15m')">15m</span>
+            <span class="sym-btn" onclick="setTF(this,'1H')">1H</span>
+            <span class="sym-btn" onclick="setTF(this,'4H')">4H</span>
+            <span class="sym-btn" onclick="setTF(this,'1D')">1D</span>
+          </div>
+        </div>
+        <div class="panel-body" style="padding:10px">
+          <div style="position:relative;height:200px"><canvas id="price-chart"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: BIAS -->
+    <div id="tab-bias" style="display:none">
+      <div class="g2 f0">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Sesgo Direccional</span>
+            <span class="panel-badge" id="bias-badge" style="background:var(--accent-green-dim);color:var(--accent-green)">—</span>
+          </div>
+          <div class="panel-body">
+            <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:8px">Posicionamiento largo/corto</div>
+            <div class="bias-bar-track">
+              <div class="bias-long" id="bias-long" style="width:0%"></div>
+              <div class="bias-short" id="bias-short" style="width:0%"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;margin-bottom:12px">
+              <span style="color:var(--accent-green)" id="bias-long-pct">—% Long</span>
+              <span style="color:var(--accent-red)" id="bias-short-pct">—% Short</span>
+            </div>
+            <div style="padding-top:10px;border-top:1px solid var(--border)">
+              <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.1em">Contexto operativo</div>
+              <div style="font-family:var(--sans);font-size:12px;color:var(--text-secondary);line-height:1.5" id="bias-context">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Niveles Clave</span></div>
+          <div class="panel-body np" id="key-levels"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: EXPOSURE -->
+    <div id="tab-exposure" style="display:none">
+      <div class="panel f0">
+        <div class="panel-header">
+          <span class="panel-title">Mi Exposición en este Símbolo</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--accent-blue)" id="exposure-tag">—</span>
+        </div>
+        <div class="panel-body np" id="exposure-block"></div>
+      </div>
+    </div>
+
+    <!-- TAB: MACRO -->
+    <div id="tab-macro" style="display:none">
+      <div class="g2 f0">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Eventos Relevantes (72h)</span></div>
+          <div class="panel-body np" id="sym-macro-list"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Drivers Fundamentales</span></div>
+          <div class="panel-body" id="macro-drivers">
+            <div style="font-family:var(--sans);font-size:12px;color:var(--text-secondary);line-height:1.6" id="drivers-text">
+              Selecciona un símbolo para ver los drivers fundamentales.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('symbol');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('symbol');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+let marketData = [];
+let selectedSym = null;
+let priceChart = null;
+let openPositions = [];
+
+const SYMBOL_INFO = {
+  XAUUSD: { full:'Gold / US Dollar', long:68, short:32, bias:'Alcista', context:'Presión inflacionaria sostiene la demanda de oro. DXY débil favorece la compra.' },
+  EURUSD: { full:'Euro / US Dollar', long:62, short:38, bias:'Alcista leve', context:'BCE mantiene postura data-dependent. Spread de tasas EUR/USD se estrecha.' },
+  GBPUSD: { full:'Pound / US Dollar', long:55, short:45, bias:'Neutro', context:'Incertidumbre sobre política del BOE. Datos de empleo UK son clave.' },
+  USDJPY: { full:'US Dollar / Yen', long:71, short:29, bias:'Alcista', context:'BOJ mantiene política ultra-acomodaticia. Diferencial de tasas favorece al USD.' },
+  NAS100: { full:'Nasdaq 100 Index', long:58, short:42, bias:'Neutro+', context:'Temporada de resultados en foco. Fed pause es positivo para tecnológicas.' },
+  US30:   { full:'Dow Jones 30', long:45, short:55, bias:'Bajista leve', context:'Rotación defensiva. Sector salud y energía lideran.' },
+  USOIL:  { full:'US Crude Oil (WTI)', long:60, short:40, bias:'Alcista', context:'OPEC+ mantiene recortes. Inventarios EIA son el catalizador clave.' },
+  BTCUSD: { full:'Bitcoin / US Dollar', long:72, short:28, bias:'Alcista', context:'Halving completado. ETF spot acumula inflows. Momentum alcista.' },
+};
+
+async function loadAll() {
+  startGlobalClock();
+  const login = localStorage.getItem('fxte_login') || '50001';
+
+  const [accRes, mktRes, openRes] = await Promise.all([
+    apiCall('/accounts/'+login+'/status'),
+    apiCall('/symbols'),
+    apiCall('/positions?login='+login+'&state=open'),
+  ]);
+
+  if(accRes?.data) updateSidebarAccount(accRes.data);
+  marketData  = mktRes?.data || MOCK.market;
+  openPositions = openRes?.data || MOCK.positions_open;
+  if(!Array.isArray(marketData)) marketData = MOCK.market;
+
+  renderSelector();
+  if(!selectedSym && marketData.length) selectSymbol(marketData[0].symbol);
+
+  connectWebSocket(msg=>{
+    if(msg.op==='accounts:balance'&&msg.data) updateSidebarAccount(msg.data);
+    if(msg.op==='positions:updated'&&msg.data) { openPositions=msg.data; if(selectedSym) updateExposure(); }
+  });
+}
+
+function renderSelector() {
+  document.getElementById('sym-selector').innerHTML = marketData.map(m=>`
+    <button class="sym-btn ${m.symbol===selectedSym?'active':''}" onclick="selectSymbol('${m.symbol}')">${m.symbol}</button>
+  `).join('');
+}
+
+function selectSymbol(sym) {
+  selectedSym = sym;
+  document.querySelectorAll('.sym-btn').forEach(b=>b.classList.toggle('active',b.textContent===sym));
+
+  const m = marketData.find(x=>x.symbol===sym) || {symbol:sym,price:0,change:0,bid:0,ask:0,session:'FX'};
+  const chg = parseFloat(m.change||0);
+  const color = chg>=0?'var(--accent-green)':'var(--accent-red)';
+  const info = SYMBOL_INFO[sym] || {};
+
+  setEl('h-name', sym);
+  setEl('h-full', info.full||sym);
+  const priceEl = document.getElementById('h-price');
+  if(priceEl){priceEl.textContent=fmtNum(m.price,m.price>100?2:5);priceEl.style.color=color;}
+  const changeEl = document.getElementById('h-change');
+  if(changeEl){changeEl.textContent=(chg>=0?'+':'')+chg.toFixed(2)+'%';changeEl.style.color=color;changeEl.style.background=chg>=0?'var(--accent-green-dim)':'var(--accent-red-dim)';}
+  setEl('h-open', fmtNum(m.price*(1-chg/100),m.price>100?2:5));
+  setEl('h-bid', fmtNum(m.bid||m.price,m.price>100?2:5));
+  setEl('h-ask', fmtNum(m.ask||m.price,m.price>100?2:5));
+  setEl('h-session', m.session||'FX');
+
+  // KPIs
+  const spread = m.ask&&m.bid?((m.ask-m.bid)*10000).toFixed(1):'—';
+  setEl('m-price', fmtNum(m.price,m.price>100?2:5));
+  setEl('m-change-sub', (chg>=0?'+':'')+chg.toFixed(2)+'% hoy');
+  document.getElementById('m-price').style.color = color;
+  setEl('m-range', '—');
+  setEl('m-atr', '—');
+  setEl('m-spread', spread);
+  setEl('chart-title', sym + ' · Precio');
+
+  // Bias
+  if(info.long!==undefined){
+    document.getElementById('bias-long').style.width=info.long+'%';
+    document.getElementById('bias-short').style.width=info.short+'%';
+    setEl('bias-long-pct',info.long+'% Long');
+    setEl('bias-short-pct',info.short+'% Short');
+    setEl('bias-context',info.context||'—');
+    const badge=document.getElementById('bias-badge');
+    if(badge){badge.textContent=info.bias||'Neutro';const bc=info.long>60?'green':info.long<40?'red':'blue';badge.style.color=`var(--accent-${bc})`;badge.style.background=`var(--accent-${bc}-dim)`;}
+  }
+
+  // Key levels
+  const base=m.price;
+  const levelData=[
+    {label:'Resistencia D1+',val:base*1.005,type:'res'},
+    {label:'Resistencia H4',  val:base*1.002,type:'res'},
+    {label:'Precio actual',   val:base,       type:'cur'},
+    {label:'Soporte H4',      val:base*0.998, type:'sup'},
+    {label:'Soporte D1',      val:base*0.995, type:'sup'},
+  ];
+  document.getElementById('key-levels').innerHTML=levelData.map(l=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border)">
+      <span style="font-family:var(--mono);font-size:9px;color:${l.type==='res'?'var(--accent-red)':l.type==='cur'?'var(--accent-blue)':'var(--accent-green)'}">${l.label}</span>
+      <span style="font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-primary)">${fmtNum(l.val,base>100?2:5)}</span>
+    </div>
+  `).join('');
+
+  updateExposure();
+  buildPriceChart(m);
+  loadMacroForSymbol(sym);
+}
+
+function updateExposure() {
+  const myPos = openPositions.filter(p=>p.symbol===selectedSym);
+  const tag = document.getElementById('exposure-tag');
+  const block = document.getElementById('exposure-block');
+  if(!myPos.length){
+    if(tag) tag.textContent='Sin posición';
+    if(block) block.innerHTML='<div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Sin posición abierta en este símbolo.</div>';
+    return;
+  }
+  const totalPnl=myPos.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+  if(tag){tag.textContent=(myPos.length+' posición'+(myPos.length>1?'es':''));tag.style.color=totalPnl>=0?'var(--accent-green)':'var(--accent-red)';}
+  if(block) block.innerHTML=myPos.map(p=>{
+    const pnl=parseFloat(p.profit||0);
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
+        <span class="pos-badge ${p.type}">${p.type.toUpperCase()}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">${p.volume} lots</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-secondary)">@ ${fmtNum(p.entry_price,5)}</span>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'};margin-left:auto">${fmtPnl(pnl)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildPriceChart(m) {
+  const ctx=document.getElementById('price-chart'); if(!ctx) return;
+  if(priceChart) priceChart.destroy();
+  const n=50;
+  const base=m.price; const data=[]; let v=base;
+  for(let i=0;i<n;i++){v+=((Math.random()-0.5)*base*0.002);data.push(parseFloat(v.toFixed(5)));}
+  const labels=Array.from({length:n},(_,i)=>{const d=new Date();d.setHours(d.getHours()-n+i);return d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});});
+  const isUp=data[data.length-1]>=data[0];
+  const color=isUp?'#00c896':'#f23645';
+  const grad=ctx.getContext('2d').createLinearGradient(0,0,0,200);
+  grad.addColorStop(0,isUp?'rgba(0,200,150,0.2)':'rgba(242,54,69,0.2)');
+  grad.addColorStop(1,isUp?'rgba(0,200,150,0)':'rgba(242,54,69,0)');
+  priceChart=new Chart(ctx,{type:'line',data:{labels,datasets:[{data,borderColor:color,borderWidth:1.5,fill:true,backgroundColor:grad,pointRadius:0,tension:0.2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#111620',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,titleColor:'#7a8599',bodyColor:'#e8edf5',titleFont:{family:"'IBM Plex Mono',monospace",size:9},bodyFont:{family:"'IBM Plex Mono',monospace",size:11}}},scales:{x:{grid:{display:false},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:7},maxRotation:0,maxTicksLimit:6}},y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:8}},border:{color:'rgba(255,255,255,0.04)'},position:'right'}}}});
+}
+
+async function loadMacroForSymbol(sym) {
+  const events = await loadMacroEvents();
+  const filtered = events; // In production: filter by currency pairs
+  const impactColor={high:'var(--accent-red)',med:'var(--accent-amber)',low:'var(--text-muted)'};
+  document.getElementById('sym-macro-list').innerHTML=filtered.map(e=>`
+    <div class="event-row">
+      <div class="event-impact" style="background:${impactColor[e.impact]||'var(--text-muted)'}"></div>
+      <span class="event-time">${e.time}</span>
+      <span class="event-name">${e.name}</span>
+      <span class="event-currency">${e.currency}</span>
+      <span class="event-countdown">${e.countdown}</span>
+    </div>
+  `).join('');
+
+  const info=SYMBOL_INFO[sym];
+  if(info) setEl('drivers-text',info.context||'Sin datos fundamentales disponibles.');
+}
+
+function switchTab(el,tabId) {
+  document.querySelectorAll('.sym-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['tab-overview','tab-bias','tab-exposure','tab-macro'].forEach(id=>{
+    document.getElementById(id).style.display=id===tabId?'block':'none';
+  });
+}
+
+function setTF(btn,tf){document.querySelectorAll('#tf-btns .sym-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');if(selectedSym){const m=marketData.find(x=>x.symbol===selectedSym);if(m)buildPriceChart(m);}setEl('chart-title',selectedSym+' · '+tf);}
+function syncPage(){showToast('Actualizando símbolos...','ok');loadAll();}
+loadAll();
+</script>
+</body>
+</html>

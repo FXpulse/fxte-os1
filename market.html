@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Market Context</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.market-card{background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:12px 14px;cursor:pointer;transition:all 0.15s;}
+.market-card:hover{border-color:var(--border-active);background:var(--bg-card-hover);}
+.market-card.selected{border-color:var(--accent-blue);background:var(--accent-blue-dim);}
+.mkt-sym{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text-primary);}
+.mkt-price{font-family:var(--mono);font-size:16px;font-weight:500;margin:4px 0;}
+.mkt-change{font-family:var(--mono);font-size:10px;font-weight:600;}
+.mkt-spread{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.bias-bar-track{height:10px;background:var(--bg-surface);border-radius:5px;overflow:hidden;display:flex;margin:8px 0;}
+.bias-long{height:100%;background:var(--accent-green);transition:width 0.8s ease;}
+.bias-short{height:100%;background:var(--accent-red);transition:width 0.8s ease;}
+.session-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-family:var(--mono);font-size:9px;font-weight:500;}
+.heatmap-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;}
+.heatmap-cell{padding:8px 4px;text-align:center;border-radius:4px;}
+.heatmap-sym{font-family:var(--mono);font-size:8px;color:var(--text-muted);margin-bottom:3px;}
+.heatmap-val{font-family:var(--mono);font-size:9px;font-weight:600;}
+</style>
+</head>
+<body>
+<script>
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<header class="topbar" id="topbar"></header>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Market Context · Análisis de mercado en vivo</div>
+        <div class="page-title">Contexto <span>de Mercado</span></div>
+        <div class="page-meta" id="mkt-time">Cargando...</div>
+      </div>
+      <div class="header-right">
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="syncPage()">↻ Actualizar</button>
+          <button class="btn" onclick="window.location.href='/symbol'">Ver Símbolos →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MARKET GRID -->
+    <div id="market-grid" class="f1" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+      <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando mercados...</div>
+    </div>
+
+    <!-- HEATMAP -->
+    <div class="panel f2">
+      <div class="panel-header">
+        <span class="panel-title">Heatmap de Cambio % — Intradía</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--accent-green);display:flex;align-items:center;gap:4px">
+          <span style="width:4px;height:4px;border-radius:50%;background:var(--accent-green);display:inline-block"></span>Live
+        </span>
+      </div>
+      <div class="panel-body">
+        <div class="heatmap-grid" id="heatmap"></div>
+      </div>
+    </div>
+
+    <!-- SESSIONS + MACRO -->
+    <div class="g2 f3">
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Sesiones de Trading · UTC</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-secondary)" id="active-sessions">—</span>
+        </div>
+        <div class="session-grid" id="session-grid-mkt"></div>
+        <div style="padding:12px 14px;border-top:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.1em">Solapamiento de sesiones</div>
+          <div style="display:flex;flex-direction:column;gap:6px" id="overlap-info">
+            <div style="font-family:var(--mono);font-size:10px;padding:6px;background:var(--accent-blue-dim);border-radius:4px;color:var(--accent-blue)">
+              Londres + NY: 13:00 – 17:00 UTC · Mayor volatilidad
+            </div>
+            <div style="font-family:var(--mono);font-size:10px;padding:6px;background:var(--bg-highlight);border-radius:4px;color:var(--text-secondary)">
+              Tokio + Londres: 08:00 – 09:00 UTC · Moderada
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Calendario Macro — Próximos Eventos</span>
+          <span class="panel-badge" id="macro-badge" style="background:var(--accent-red-dim);color:var(--accent-red)">— eventos</span>
+        </div>
+        <div class="panel-body np" id="macro-list"></div>
+      </div>
+
+    </div>
+
+    <!-- SENTIMENT + VOLATILITY -->
+    <div class="g2 f4">
+
+      <!-- SENTIMENT (COT-based) -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Sesgo Direccional por Par</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">Basado en posicionamiento</span>
+        </div>
+        <div class="panel-body np" id="sentiment-list"></div>
+      </div>
+
+      <!-- VOLATILITY -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Volatilidad Relativa (ATR %)</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">vs promedio 14 días</span>
+        </div>
+        <div class="panel-body np" id="volatility-list"></div>
+      </div>
+
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('market');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('market');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+let marketData = [];
+
+async function loadAll() {
+  startGlobalClock();
+  startSessionClock();
+  const login = localStorage.getItem('fxte_login') || '50001';
+
+  const [accRes, mktRes, macroEvts] = await Promise.all([
+    apiCall('/accounts/'+login+'/status'),
+    apiCall('/symbols'),
+    loadMacroEvents(),
+  ]);
+
+  if(accRes?.data) updateSidebarAccount(accRes.data);
+  marketData = mktRes?.data || MOCK.market;
+  if(!Array.isArray(marketData)) marketData = MOCK.market;
+
+  renderMarketGrid();
+  renderHeatmap();
+  renderMacroList(macroEvts);
+  renderSentiment();
+  renderVolatility();
+
+  setEl('mkt-time', 'Actualizado: ' + new Date().toLocaleTimeString('es') + ' UTC');
+  setEl('macro-badge', macroEvts.length + ' eventos');
+
+  // Live updates
+  connectWebSocket(msg=>{
+    if(msg.op==='positions:updated') return;
+    if(msg.op==='accounts:balance'&&msg.data) updateSidebarAccount(msg.data);
+  });
+
+  // Auto-refresh market data every 30s
+  setInterval(()=>{ apiCall('/symbols').then(r=>{ if(r?.data){marketData=r.data;renderMarketGrid();renderHeatmap();}});}, 30000);
+}
+
+function renderMarketGrid() {
+  const el = document.getElementById('market-grid');
+  el.innerHTML = marketData.map(m=>{
+    const chg = parseFloat(m.change||0);
+    const color = chg>=0?'var(--accent-green)':'var(--accent-red)';
+    const bg = chg>=0?'rgba(0,200,150,0.04)':'rgba(242,54,69,0.04)';
+    const spread = m.ask&&m.bid ? ((m.ask-m.bid)*10000).toFixed(1)+' pips' : '—';
+    return `
+      <div class="market-card" style="border-top:2px solid ${color}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div class="mkt-sym">${m.symbol}</div>
+          <span class="session-pill" style="background:${bg};color:${color}">${m.session||'FX'}</span>
+        </div>
+        <div class="mkt-price" style="color:${color}">${fmtNum(m.price,m.price>100?2:5)}</div>
+        <div style="display:flex;justify-content:space-between">
+          <span class="mkt-change" style="color:${color}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>
+          <span class="mkt-spread">Spr: ${spread}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderHeatmap() {
+  document.getElementById('heatmap').innerHTML = marketData.map(m=>{
+    const chg = parseFloat(m.change||0);
+    const intensity = Math.min(Math.abs(chg)/2,1);
+    const bg = chg>0?`rgba(0,200,150,${0.1+intensity*0.3})`:`rgba(242,54,69,${0.1+intensity*0.3})`;
+    const color = chg>0?'var(--accent-green)':'var(--accent-red)';
+    return `
+      <div class="heatmap-cell" style="background:${bg}">
+        <div class="heatmap-sym">${m.symbol}</div>
+        <div class="heatmap-val" style="color:${color}">${chg>=0?'+':''}${chg.toFixed(2)}%</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderMacroList(events) {
+  const impactColor = {high:'var(--accent-red)',med:'var(--accent-amber)',low:'var(--text-muted)'};
+  document.getElementById('macro-list').innerHTML = events.map(e=>`
+    <div class="event-row">
+      <div class="event-impact" style="background:${impactColor[e.impact]||'var(--text-muted)'}"></div>
+      <span class="event-time">${e.time}</span>
+      <span class="event-name">${e.name}</span>
+      <span class="event-currency">${e.currency}</span>
+      <span class="event-countdown">${e.countdown}</span>
+    </div>
+  `).join('');
+}
+
+function renderSentiment() {
+  const pairs = [
+    {sym:'EURUSD', long:62, short:38, bias:'Alcista', color:'var(--accent-green)'},
+    {sym:'GBPUSD', long:55, short:45, bias:'Neutro+', color:'var(--accent-blue)'},
+    {sym:'USDJPY', long:71, short:29, bias:'Alcista', color:'var(--accent-green)'},
+    {sym:'XAUUSD', long:68, short:32, bias:'Alcista', color:'var(--accent-green)'},
+    {sym:'NAS100', long:58, short:42, bias:'Neutro+', color:'var(--accent-blue)'},
+    {sym:'US30',   long:45, short:55, bias:'Bajista', color:'var(--accent-red)'},
+  ];
+  document.getElementById('sentiment-list').innerHTML = pairs.map(p=>`
+    <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-primary)">${p.sym}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:${p.color};padding:2px 6px;background:${p.color}22;border-radius:3px">${p.bias}</span>
+      </div>
+      <div class="bias-bar-track">
+        <div class="bias-long" style="width:${p.long}%"></div>
+        <div class="bias-short" style="width:${p.short}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px">
+        <span style="color:var(--accent-green)">${p.long}% Long</span>
+        <span style="color:var(--accent-red)">${p.short}% Short</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderVolatility() {
+  const vols = [
+    {sym:'XAUUSD',atr:8.40,rel:142,level:'Alta'},
+    {sym:'NAS100',atr:180,  rel:128,level:'Alta'},
+    {sym:'EURUSD',atr:0.0065,rel:98,level:'Normal'},
+    {sym:'GBPUSD',atr:0.0082,rel:105,level:'Normal'},
+    {sym:'USDJPY',atr:0.68, rel:115,level:'Normal'},
+    {sym:'US30',  atr:150,  rel:88, level:'Baja'},
+  ];
+  document.getElementById('volatility-list').innerHTML = vols.map(v=>{
+    const color = v.rel>130?'var(--accent-red)':v.rel>100?'var(--accent-amber)':'var(--accent-green)';
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-primary);width:60px">${v.sym}</span>
+        <div style="flex:1;height:6px;background:var(--bg-surface);border-radius:3px;overflow:hidden">
+          <div style="width:${Math.min(v.rel,200)/2}%;height:100%;background:${color};border-radius:3px;transition:width 0.8s"></div>
+        </div>
+        <span style="font-family:var(--mono);font-size:10px;color:${color};width:40px;text-align:right">${v.rel}%</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted);width:40px">${v.level}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function startSessionClock() {
+  function tick() {
+    const active = getActiveSessions();
+    setEl('active-sessions', active.length?'● '+active.join(' · '):'Sin sesión');
+    const grid = document.getElementById('session-grid-mkt');
+    if(!grid) return;
+    grid.innerHTML = SESSIONS.map(s=>{
+      const on = isSessionActive(s.open,s.close);
+      return `<div class="session-box"><div class="session-name">${s.name}</div><div class="session-status" style="color:${on?'var(--accent-green)':'var(--text-muted)'}">${on?'OPEN':'CLOSED'}</div><div class="session-hours">${s.open}:00–${s.close}:00</div></div>`;
+    }).join('');
+    setEl('mkt-time','Actualizado: '+new Date().toLocaleTimeString('es')+' UTC');
+  }
+  tick();
+  setInterval(tick,10000);
+}
+
+function syncPage(){showToast('Actualizando mercados...','ok');loadAll();}
+loadAll();
+</script>
+</body>
+</html>

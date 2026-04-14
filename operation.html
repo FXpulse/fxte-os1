@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Operation Log</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;}
+.filter-btn{font-family:var(--mono);font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:5px 10px;border-radius:4px;border:1px solid var(--border-active);background:var(--bg-card);color:var(--text-secondary);cursor:pointer;transition:all 0.15s;}
+.filter-btn.active,.filter-btn:hover{background:var(--accent-blue-dim);border-color:var(--accent-blue);color:var(--accent-blue);}
+.filter-input{background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;padding:5px 10px;font-family:var(--mono);font-size:11px;color:var(--text-primary);outline:none;width:140px;}
+.filter-input:focus{border-color:var(--accent-blue);}
+.journal-row{display:grid;grid-template-columns:60px 80px 60px 70px 90px 90px 80px 80px 1fr;gap:0;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);transition:background 0.1s;}
+.journal-row:hover{background:var(--bg-highlight);}
+.journal-row.header{background:var(--bg-surface);border-bottom:1px solid var(--border);}
+.j-cell{font-family:var(--mono);font-size:10px;color:var(--text-secondary);}
+.j-cell.bold{color:var(--text-primary);font-weight:500;}
+.j-cell.hdr{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;}
+</style>
+</head>
+<body>
+<script>
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<header class="topbar" id="topbar"></header>
+
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <main class="main-content">
+
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Operation Log · Historial completo</div>
+        <div class="page-title">Diario de <span>Operaciones</span></div>
+        <div class="page-meta" id="journal-meta">Cargando...</div>
+      </div>
+      <div class="header-right">
+        <button class="btn" onclick="syncPage()">↻ Actualizar</button>
+      </div>
+    </div>
+
+    <!-- SUMMARY BANNER -->
+    <div class="g4 f1">
+      <div class="kpi-card" style="--kpi-color:var(--accent-green)">
+        <div class="kpi-label">Total Cerradas</div>
+        <div class="kpi-value" id="j-total">—</div>
+        <div class="kpi-sub" id="j-total-sub">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-blue)">
+        <div class="kpi-label">Win Rate</div>
+        <div class="kpi-value" id="j-wr">—</div>
+        <div class="kpi-sub" id="j-wr-sub">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-amber)">
+        <div class="kpi-label">P&L Neto</div>
+        <div class="kpi-value" id="j-pnl">—</div>
+        <div class="kpi-sub" id="j-pnl-sub">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-red)">
+        <div class="kpi-label">Abiertas Ahora</div>
+        <div class="kpi-value" id="j-open">—</div>
+        <div class="kpi-sub" id="j-open-pnl">—</div>
+      </div>
+    </div>
+
+    <!-- OPEN POSITIONS -->
+    <div class="panel f2">
+      <div class="panel-header">
+        <span class="panel-title">Posiciones Abiertas (Live)</span>
+        <span style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--accent-green)">
+          <span style="width:4px;height:4px;border-radius:50%;background:var(--accent-green);display:inline-block"></span>Live
+        </span>
+      </div>
+      <div id="open-positions-section"></div>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filter-bar f3">
+      <button class="filter-btn active" onclick="setFilter('all',this)">Todas</button>
+      <button class="filter-btn" onclick="setFilter('buy',this)">BUY</button>
+      <button class="filter-btn" onclick="setFilter('sell',this)">SELL</button>
+      <button class="filter-btn" onclick="setFilter('win',this)">Ganadoras</button>
+      <button class="filter-btn" onclick="setFilter('loss',this)">Perdedoras</button>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <input class="filter-input" id="symbol-filter" placeholder="Símbolo..." oninput="renderJournal()">
+        <input class="filter-input" id="date-from" type="date" onchange="renderJournal()" style="width:130px">
+        <input class="filter-input" id="date-to"   type="date" onchange="renderJournal()" style="width:130px">
+      </div>
+    </div>
+
+    <!-- JOURNAL TABLE -->
+    <div class="panel f4">
+      <div class="panel-header">
+        <span class="panel-title">Historial de Operaciones Cerradas</span>
+        <span class="panel-badge" id="journal-count" style="background:var(--accent-blue-dim);color:var(--accent-blue)">—</span>
+      </div>
+      <div class="journal-row header">
+        <span class="j-cell hdr">#ID</span>
+        <span class="j-cell hdr">Símbolo</span>
+        <span class="j-cell hdr">Tipo</span>
+        <span class="j-cell hdr">Vol</span>
+        <span class="j-cell hdr">Entrada</span>
+        <span class="j-cell hdr">Cierre</span>
+        <span class="j-cell hdr">P&L</span>
+        <span class="j-cell hdr">Swap</span>
+        <span class="j-cell hdr">Hora</span>
+      </div>
+      <div id="journal-body"></div>
+    </div>
+
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('operation');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('operation');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+let allTrades = [];
+let openTrades = [];
+let currentFilter = 'all';
+
+async function loadAll() {
+  startGlobalClock();
+  const login = localStorage.getItem('fxte_login') || '50001';
+
+  const [accRes, openRes, closedRes, statsRes] = await Promise.all([
+    apiCall('/accounts/'+login+'/status'),
+    apiCall('/positions?login='+login+'&state=open'),
+    apiCall('/positions?login='+login+'&state=closed'),
+    apiCall('/positions/stats?login='+login+'&state=closed'),
+  ]);
+
+  const acc   = accRes?.data   || MOCK.account;
+  openTrades  = openRes?.data  || MOCK.positions_open;
+  allTrades   = closedRes?.data|| MOCK.positions_closed;
+  const stats = statsRes?.data || MOCK.stats;
+
+  updateSidebarAccount(acc);
+  renderSummary(stats, openTrades);
+  renderOpenPositions(openTrades);
+  renderJournal();
+
+  setEl('journal-meta', allTrades.length + ' operaciones cerradas · login ' + login);
+  connectWebSocket(msg => {
+    if(msg.op==='positions:updated'&&msg.data){openTrades=msg.data;renderOpenPositions(openTrades);}
+  });
+}
+
+function renderSummary(stats, open) {
+  const total  = parseInt(stats.total||0);
+  const wins   = parseInt(stats.wins||0);
+  const profit = parseFloat(stats.profit||0);
+  const loss   = parseFloat(stats.loss||0);
+  const wr     = total>0?wins/total*100:0;
+  const openPnl= open.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+
+  setEl('j-total', total);
+  setEl('j-total-sub', wins+' wins · '+(total-wins)+' losses');
+  setEl('j-wr', wr.toFixed(1)+'%');
+  setEl('j-wr-sub', wins+' de '+total+' trades');
+  setEl('j-pnl', fmtPnl(profit+loss));
+  const pnlSub = document.getElementById('j-pnl-sub');
+  if(pnlSub){pnlSub.textContent='PF: '+((loss!==0?Math.abs(profit/loss):0).toFixed(2));pnlSub.style.color=profit+loss>=0?'var(--accent-green)':'var(--accent-red)';}
+  setEl('j-open', open.length);
+  const openEl = document.getElementById('j-open-pnl');
+  if(openEl){openEl.textContent='P&L flotante: '+fmtPnl(openPnl);openEl.style.color=openPnl>=0?'var(--accent-green)':'var(--accent-red)';}
+}
+
+function renderOpenPositions(open) {
+  const el = document.getElementById('open-positions-section');
+  if(!open||!open.length){el.innerHTML='<div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Sin posiciones abiertas.</div>';return;}
+  el.innerHTML = open.map(p=>{
+    const pnl=parseFloat(p.profit||0);
+    return `
+      <div style="display:grid;grid-template-columns:80px 60px 70px 1fr 90px 80px;gap:0;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border)">
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text-primary)">${p.symbol}</span>
+        <span class="pos-badge ${p.type}" style="font-size:9px">${p.type.toUpperCase()}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">${p.volume} lots</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-secondary)">Entrada: ${fmtNum(p.entry_price,5)}</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted)">${new Date(p.open_time||Date.now()).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</span>
+        <span style="font-family:var(--mono);font-size:11px;font-weight:600;color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'};text-align:right">${fmtPnl(pnl)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function setFilter(f,btn){
+  currentFilter=f;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderJournal();
+}
+
+function renderJournal() {
+  let list = [...allTrades];
+  if(currentFilter==='buy')  list=list.filter(t=>t.type==='buy');
+  if(currentFilter==='sell') list=list.filter(t=>t.type==='sell');
+  if(currentFilter==='win')  list=list.filter(t=>parseFloat(t.profit||0)>0);
+  if(currentFilter==='loss') list=list.filter(t=>parseFloat(t.profit||0)<0);
+
+  const sym = document.getElementById('symbol-filter')?.value?.toUpperCase();
+  if(sym) list=list.filter(t=>t.symbol.includes(sym));
+
+  const from = document.getElementById('date-from')?.value;
+  const to   = document.getElementById('date-to')?.value;
+  if(from) list=list.filter(t=>new Date(t.close_time||t.open_time)>=new Date(from));
+  if(to)   list=list.filter(t=>new Date(t.close_time||t.open_time)<=new Date(to+'T23:59:59'));
+
+  setEl('journal-count', list.length + ' operaciones');
+
+  if(!list.length){
+    document.getElementById('journal-body').innerHTML='<div style="padding:20px;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Sin resultados con los filtros actuales.</div>';
+    return;
+  }
+
+  document.getElementById('journal-body').innerHTML = list.map(t=>{
+    const pnl=parseFloat(t.profit||0);
+    const closeTime=t.close_time?new Date(t.close_time).toLocaleString('es',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—';
+    return `
+      <div class="journal-row">
+        <span class="j-cell">#${t.id||'—'}</span>
+        <span class="j-cell bold">${t.symbol}</span>
+        <span class="j-cell"><span class="pos-badge ${t.type}" style="font-size:8px">${t.type.toUpperCase()}</span></span>
+        <span class="j-cell">${t.volume}</span>
+        <span class="j-cell">${fmtNum(t.entry_price,5)}</span>
+        <span class="j-cell">${fmtNum(t.close_price||t.current_price,5)}</span>
+        <span class="j-cell" style="color:${pnl>=0?'var(--accent-green)':'var(--accent-red)'};font-weight:600">${fmtPnl(pnl)}</span>
+        <span class="j-cell" style="color:var(--text-muted)">${fmtPnl(parseFloat(t.swap||0))}</span>
+        <span class="j-cell">${closeTime}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function syncPage(){showToast('Cargando trades...','ok');loadAll();}
+loadAll();
+</script>
+</body>
+</html>

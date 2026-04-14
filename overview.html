@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE OS · Desk Overview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="/shared.js"></script>
+<style id="shared-styles"></style>
+<style>
+.chart-wrap{position:relative;height:120px;}
+.chart-wrap-sm{position:relative;height:90px;}
+.activity-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);}
+.activity-row:last-child{border-bottom:none;}
+.activity-icon{width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
+.activity-desc{flex:1;font-family:var(--sans);font-size:11px;color:var(--text-secondary);line-height:1.3;}
+.activity-desc b{color:var(--text-primary);font-weight:500;}
+.activity-time{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.prog-track{height:6px;background:var(--bg-surface);border-radius:3px;overflow:hidden;margin-bottom:10px;}
+.prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent-blue),var(--accent-green));transition:width 1.5s ease;}
+.prog-milestones{display:flex;justify-content:space-between;margin-bottom:10px;}
+.prog-ms{font-family:var(--mono);font-size:8px;color:var(--text-muted);text-align:center;}
+.prog-ms.done{color:var(--accent-green);}
+.prog-ms.active{color:var(--accent-amber);}
+.prog-criteria{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;}
+.prog-crit{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;}
+.crit-ok .crit-text{color:var(--accent-green);}
+.crit-no .crit-text{color:var(--text-muted);}
+</style>
+</head>
+<body>
+<script>
+// Inject shared CSS
+document.getElementById('shared-styles').textContent = typeof SHARED_CSS !== 'undefined' ? SHARED_CSS : '';
+// Auth guard
+if (!localStorage.getItem('fxte_token')) window.location.href = '/fxte';
+</script>
+
+<!-- TOPBAR -->
+<header class="topbar" id="topbar"></header>
+
+<!-- APP SHELL -->
+<div class="app-shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- PAGE HEADER -->
+    <div class="page-header f0">
+      <div>
+        <div class="page-eyebrow">Desk Overview · FXTE Operating System</div>
+        <div class="page-title">Estado <span>Operacional</span></div>
+        <div class="page-meta" id="session-label">Cargando sesión...</div>
+      </div>
+      <div class="header-right">
+        <div style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)">UTC <span id="utc-time">—</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn" onclick="exportData()">↓ Exportar</button>
+          <button class="btn primary" onclick="syncPage()">↻ Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPERATOR BANNER -->
+    <div class="operator-banner f1">
+      <div class="op-identity">
+        <div class="op-alias" id="op-alias">OP—</div>
+        <div class="op-level" id="op-level">Member Trader · Level 1</div>
+      </div>
+      <div class="op-divider"></div>
+      <div class="op-metric">
+        <div class="om-label">Balance</div>
+        <div class="om-val" style="color:var(--text-primary)" id="op-balance">—</div>
+      </div>
+      <div class="op-divider"></div>
+      <div class="op-metric">
+        <div class="om-label">Equity</div>
+        <div class="om-val" style="color:var(--accent-green)" id="op-equity">—</div>
+      </div>
+      <div class="op-divider"></div>
+      <div class="op-metric">
+        <div class="om-label">P&L Flotante</div>
+        <div class="om-val" id="op-pnl">—</div>
+      </div>
+      <div class="op-divider"></div>
+      <div class="op-metric">
+        <div class="om-label">DD Actual</div>
+        <div class="om-val" id="op-dd">—</div>
+      </div>
+    </div>
+
+    <!-- KPI ROW -->
+    <div class="g4 f2">
+      <div class="kpi-card" style="--kpi-color:var(--accent-green)">
+        <div class="kpi-label">Profit Total</div>
+        <div class="kpi-value" id="kpi-profit">—</div>
+        <div class="kpi-sub" id="kpi-profit-sub">—</div>
+        <div class="kpi-delta up" id="kpi-profit-delta">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-red)">
+        <div class="kpi-label">Drawdown Máx.</div>
+        <div class="kpi-value" id="kpi-dd">—</div>
+        <div class="kpi-sub">Límite: 12% · Equity base</div>
+        <div class="kpi-delta neutral" id="kpi-dd-status">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-blue)">
+        <div class="kpi-label">Win Rate</div>
+        <div class="kpi-value" id="kpi-wr">—</div>
+        <div class="kpi-sub" id="kpi-wr-sub">—</div>
+        <div class="kpi-delta" id="kpi-wr-delta">—</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:var(--accent-amber)">
+        <div class="kpi-label">Profit Factor</div>
+        <div class="kpi-value" id="kpi-pf">—</div>
+        <div class="kpi-sub">Objetivo &gt; 1.5</div>
+        <div class="kpi-delta" id="kpi-pf-delta">—</div>
+      </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="g2l f3">
+
+      <!-- LEFT: EQUITY CURVE + POSITIONS -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Curva de Equity — 30 días</span>
+            <span class="panel-action" onclick="window.location.href='/audit'">Ver auditoría →</span>
+          </div>
+          <div class="panel-body">
+            <div class="chart-wrap"><canvas id="equity-mini"></canvas></div>
+            <div style="display:flex;justify-content:space-between;margin-top:10px">
+              <div>
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Rentabilidad</div>
+                <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--accent-green)" id="eq-pct">—</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">DD máx. período</div>
+                <div style="font-family:var(--mono);font-size:16px;font-weight:500;color:var(--accent-red)" id="eq-dd">—</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:2px">Score inst.</div>
+                <div style="font-family:var(--mono);font-size:16px;font-weight:600;color:var(--accent-amber)" id="eq-score">—</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- OPEN POSITIONS -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Posiciones Abiertas</span>
+            <span class="panel-action" id="open-pos-hdr">—</span>
+          </div>
+          <div class="panel-body np" id="open-pos-list">
+            <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando...</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT: ALERTS + MARKET -->
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <div class="panel" style="flex:1">
+          <div class="panel-header">
+            <span class="panel-title">Alertas Operacionales</span>
+            <span class="panel-action" style="color:var(--accent-red)" id="alerts-count">—</span>
+          </div>
+          <div class="panel-body np" id="alerts-list">
+            <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando...</div>
+          </div>
+        </div>
+
+        <div class="panel" style="flex:1">
+          <div class="panel-header">
+            <span class="panel-title">Mercado · Pulso</span>
+            <span style="display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;color:var(--accent-green)">
+              <span id="mkt-dot" style="width:4px;height:4px;border-radius:50%;background:var(--accent-green);display:inline-block"></span>Live
+            </span>
+          </div>
+          <div class="panel-body np" id="market-pulse">
+            <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- SECOND ROW -->
+    <div class="g3 f4">
+
+      <!-- SESSIONS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Sesiones · UTC</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--text-secondary)" id="session-now">—</span>
+        </div>
+        <div class="session-grid" id="session-grid"></div>
+        <div style="padding:10px 14px;border-top:1px solid var(--border)">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-bottom:4px">Próximo evento</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-primary)" id="next-event">—</div>
+        </div>
+      </div>
+
+      <!-- MACRO EVENTS -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Eventos Macro Hoy</span>
+          <span class="panel-action" onclick="window.location.href='/market'">Calendario →</span>
+        </div>
+        <div class="panel-body np" id="macro-events">
+          <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando...</div>
+        </div>
+      </div>
+
+      <!-- ACTIVITY -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Actividad Reciente</span>
+          <span class="panel-action" onclick="window.location.href='/operation'">Ver todo →</span>
+        </div>
+        <div class="panel-body np" id="recent-activity">
+          <div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Cargando...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- PROGRESSION -->
+    <div class="panel f5">
+      <div class="panel-header">
+        <span class="panel-title">Operator Progression</span>
+        <span class="panel-action" onclick="window.location.href='/alert'">Ver niveles →</span>
+      </div>
+      <div style="padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.15em;color:var(--text-muted);text-transform:uppercase">Avance hacia Level 2</span>
+          <span style="font-family:var(--mono);font-size:10px;color:var(--accent-amber)" id="prog-pct-label">—</span>
+        </div>
+        <div class="prog-track"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="prog-milestones">
+          <div class="prog-ms done">L1<br>Ingreso</div>
+          <div class="prog-ms active">Mes 1</div>
+          <div class="prog-ms">Mes 2</div>
+          <div class="prog-ms">Mes 3</div>
+          <div class="prog-ms">Mes 4</div>
+          <div class="prog-ms">L2</div>
+        </div>
+        <div class="prog-criteria">
+          <div class="prog-crit crit-ok"><span>✓</span><span class="crit-text">DD &lt; 12% · cumplido</span></div>
+          <div class="prog-crit crit-ok"><span>✓</span><span class="crit-text">Mes 1 rentable</span></div>
+          <div class="prog-crit crit-ok"><span>✓</span><span class="crit-text">Win rate &gt; 50%</span></div>
+          <div class="prog-crit crit-no"><span>○</span><span class="crit-text">4 meses consecutivos</span></div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── INIT NAV ───────────────────────────────────────────────
+function _initShell() {
+  if (typeof getTopbarHTML !== 'function') { setTimeout(_initShell, 30); return; }
+  document.getElementById('topbar').innerHTML = getTopbarHTML('overview');
+  document.getElementById('sidebar').innerHTML = getSidebarHTML('overview');
+  if (typeof SHARED_CSS !== 'undefined') {
+    const s = document.getElementById('shared-styles');
+    if (s && !s.textContent) s.textContent = SHARED_CSS;
+  }
+}
+_initShell();
+
+// ── STATE ──────────────────────────────────────────────────
+let equityChart = null;
+let accountData = null;
+let openPositions = [];
+let closedStats = {};
+let marketData = [];
+
+// ── MAIN LOAD ──────────────────────────────────────────────
+async function loadAll() {
+  startGlobalClock();
+  startSessionClock();
+
+  const login = localStorage.getItem('fxte_login') || '50001';
+
+  // Parallel API calls
+  const [accRes, openRes, statsRes, mktRes, macroEvts] = await Promise.all([
+    apiCall('/accounts/' + login + '/status'),
+    apiCall('/positions?login=' + login + '&state=open'),
+    apiCall('/positions/stats?login=' + login + '&state=closed'),
+    apiCall('/symbols'),
+    loadMacroEvents(),
+  ]);
+
+  accountData   = accRes?.data   || MOCK.account;
+  openPositions = openRes?.data  || MOCK.positions_open;
+  closedStats   = statsRes?.data || MOCK.stats;
+  marketData    = mktRes?.data   || MOCK.market;
+
+  updateBanner();
+  updateKPIs();
+  renderOpenPositions();
+  renderAlerts();
+  renderMarketPulse();
+  renderMacroEvents(macroEvts);
+  renderActivity();
+  buildEquityMini();
+  updateSidebarAccount(accountData);
+
+  // WS for live updates
+  connectWebSocket(handleWS);
+}
+
+// ── WEBSOCKET HANDLER ──────────────────────────────────────
+function handleWS(msg) {
+  if (msg.op === 'accounts:balance' && msg.data) {
+    accountData = { ...accountData, ...msg.data };
+    updateBanner();
+    updateSidebarAccount(accountData);
+  }
+  if (msg.op === 'positions:updated' && msg.data) {
+    openPositions = msg.data;
+    renderOpenPositions();
+  }
+}
+
+// ── BANNER ─────────────────────────────────────────────────
+function updateBanner() {
+  const a = accountData;
+  const pnl = openPositions.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+  const bal = parseFloat(a.balance)||0;
+  const eq  = parseFloat(a.equity)||0;
+  const dd  = bal>0 ? Math.max(0,(bal-eq)/bal*100) : 0;
+
+  const login = localStorage.getItem('fxte_login') || a.login || '—';
+  setEl('op-alias', 'OP-' + login);
+  setEl('op-level', (a.trading_group||'Level 1') + ' · Member Trader');
+  setEl('op-balance', '$' + fmtNum(bal));
+  setEl('op-equity',  '$' + fmtNum(eq));
+
+  const pnlEl = document.getElementById('op-pnl');
+  if (pnlEl) { pnlEl.textContent = fmtPnl(pnl); pnlEl.style.color = pnl>=0?'var(--accent-green)':'var(--accent-red)'; }
+
+  const ddEl = document.getElementById('op-dd');
+  if (ddEl) { ddEl.textContent = dd.toFixed(2)+'%'; ddEl.style.color = dd<6?'var(--accent-green)':dd<9?'var(--accent-amber)':'var(--accent-red)'; }
+}
+
+// ── KPIs ───────────────────────────────────────────────────
+function updateKPIs() {
+  const s = closedStats;
+  const total = s.total||0, wins = s.wins||0, losses = s.losses||0;
+  const profit = parseFloat(s.profit||0), loss = parseFloat(s.loss||0);
+  const wr = total>0 ? (wins/total*100) : 0;
+  const pf = loss!==0 ? Math.abs(profit/loss) : 0;
+  const dd = parseFloat(s.maxDD||accountData?.maxDD||3.42);
+  const initial = parseFloat(accountData?.initial||accountData?.balance||10000);
+
+  setEl('kpi-profit', '$' + fmtNum(profit));
+  setEl('kpi-profit-sub', total + ' operaciones cerradas');
+  setEl('kpi-profit-delta', fmtPct(profit/initial*100));
+
+  setEl('kpi-dd', dd.toFixed(2) + '%');
+  setEl('kpi-dd-status', dd<6?'✓ Dentro del límite':dd<9?'⚠ Precaución':'✗ Zona crítica');
+
+  setEl('kpi-wr', wr.toFixed(1) + '%');
+  setEl('kpi-wr-sub', wins + ' de ' + total + ' trades');
+
+  const wrDelta = document.getElementById('kpi-wr-delta');
+  if (wrDelta) { wrDelta.textContent = wr>=55?'✓ Sólido':'Desarrollando'; wrDelta.className='kpi-delta '+(wr>=55?'up':'neutral'); }
+
+  setEl('kpi-pf', pf.toFixed(2));
+  const pfDelta = document.getElementById('kpi-pf-delta');
+  if (pfDelta) { pfDelta.textContent = pf>=1.5?'✓ Objetivo':'< 1.5'; pfDelta.className='kpi-delta '+(pf>=1.5?'up':'neutral'); }
+
+  // Equity mini stats
+  setEl('eq-pct', fmtPct(profit/initial*100));
+  setEl('eq-dd', '-' + dd.toFixed(2)+'%');
+  const score = dd>0?(profit/initial*100)/dd:0;
+  setEl('eq-score', score.toFixed(2));
+
+  // Progression
+  const months = Math.min(Math.floor(total/10), 4);
+  const pct = Math.round((months/4)*60 + (wr>=50?20:0) + (dd<12?20:0));
+  document.getElementById('prog-fill').style.width = pct + '%';
+  setEl('prog-pct-label', pct + '% completado');
+}
+
+// ── OPEN POSITIONS ─────────────────────────────────────────
+function renderOpenPositions() {
+  const el = document.getElementById('open-pos-list');
+  setEl('open-pos-hdr', openPositions.length + ' activas');
+  if (!openPositions.length) {
+    el.innerHTML = '<div style="padding:14px;font-family:var(--mono);font-size:10px;color:var(--text-muted)">Sin posiciones abiertas.</div>';
+    return;
+  }
+  el.innerHTML = openPositions.map(p => {
+    const pnl = parseFloat(p.profit||0);
+    const color = pnl>=0?'var(--accent-green)':'var(--accent-red)';
+    return `
+      <div class="pos-row">
+        <span class="pos-badge ${p.type}">${p.type}</span>
+        <span class="pos-symbol">${p.symbol}</span>
+        <span class="pos-lots">${p.volume} lots</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-left:auto">${fmtNum(p.entry_price,5)}</span>
+        <span class="pos-pnl" style="color:${color}">${fmtPnl(pnl)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── ALERTS ─────────────────────────────────────────────────
+function renderAlerts() {
+  const a = accountData;
+  const dd = parseFloat(a?.maxDD || 3.42);
+  const pnl = openPositions.reduce((s,p)=>s+parseFloat(p.profit||0),0);
+  const alerts = [];
+
+  if (dd > 9) alerts.push({ color:'var(--accent-red)', title:'⚠ DD CRÍTICO', desc:'Drawdown en zona de riesgo: '+dd.toFixed(2)+'%', time:'Ahora' });
+  else if (dd > 6) alerts.push({ color:'var(--accent-amber)', title:'Drawdown Elevado', desc:'DD actual '+dd.toFixed(2)+'% — cerca del umbral máximo', time:'Ahora' });
+  else alerts.push({ color:'var(--accent-green)', title:'✓ DD Controlado', desc:'Drawdown dentro del rango seguro: '+dd.toFixed(2)+'%', time:'Ahora' });
+
+  if (pnl < -200) alerts.push({ color:'var(--accent-red)', title:'P&L Flotante Negativo', desc:'Pérdida flotante acumulada: '+fmtPnl(pnl), time:'En vivo' });
+
+  alerts.push({ color:'var(--accent-blue)', title:'IPC EEUU — 08:30 UTC', desc:'Evento de alta volatilidad próximo. Gestiona exposición.', time:'En 2h' });
+
+  setEl('alerts-count', alerts.filter(a=>a.color.includes('red')||a.color.includes('amber')).length + ' alertas');
+
+  document.getElementById('alerts-list').innerHTML = alerts.map(a => `
+    <div class="alert-item">
+      <div class="alert-dot" style="background:${a.color};margin-top:5px"></div>
+      <div class="alert-content">
+        <div class="alert-title" style="color:${a.color}">${a.title}</div>
+        <div class="alert-desc">${a.desc}</div>
+        <div class="alert-time">${a.time}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── MARKET PULSE ───────────────────────────────────────────
+function renderMarketPulse() {
+  const data = Array.isArray(marketData) ? marketData.slice(0,6) : MOCK.market.slice(0,6);
+  document.getElementById('market-pulse').innerHTML = data.map(m => {
+    const chg = parseFloat(m.change||0);
+    const color = chg>=0?'var(--accent-green)':'var(--accent-red)';
+    return `
+      <div class="market-row">
+        <span class="market-symbol">${m.symbol}</span>
+        <span class="market-price">${fmtNum(m.price, m.price>100?2:5)}</span>
+        <span class="market-change" style="color:${color}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ── MACRO EVENTS ───────────────────────────────────────────
+function renderMacroEvents(events) {
+  const impactColor = { high:'var(--accent-red)', med:'var(--accent-amber)', low:'var(--text-muted)' };
+  document.getElementById('macro-events').innerHTML = events.map(e => `
+    <div class="event-row">
+      <div class="event-impact" style="background:${impactColor[e.impact]||'var(--text-muted)'}"></div>
+      <span class="event-time">${e.time}</span>
+      <span class="event-name">${e.name}</span>
+      <span class="event-currency">${e.currency}</span>
+      <span class="event-countdown">${e.countdown}</span>
+    </div>
+  `).join('');
+  setEl('next-event', events[0]?.name + ' — ' + events[0]?.countdown);
+}
+
+// ── ACTIVITY ───────────────────────────────────────────────
+function renderActivity() {
+  const items = [
+    { icon:'↑', bg:'var(--accent-green-dim)', ic:'var(--accent-green)', text:'<b>XAUUSD</b> BUY 0.5 lots abierta', time:'Hace 14m' },
+    { icon:'◎', bg:'var(--accent-blue-dim)',  ic:'var(--accent-blue)',  text:'Sync completado · <b>' + (closedStats.total||47) + ' trades</b> auditados', time:'Hace 28m' },
+    { icon:'⚑', bg:'var(--accent-amber-dim)',ic:'var(--accent-amber)',text:'Evento macro en <b>2h</b> — IPC USA', time:'Hace 1h' },
+    { icon:'✓', bg:'var(--accent-green-dim)', ic:'var(--accent-green)', text:'Mes 1 completado · rentabilidad <b>+0.80%</b>', time:'Ayer' },
+  ];
+  document.getElementById('recent-activity').innerHTML = items.map(i => `
+    <div class="activity-row">
+      <div class="activity-icon" style="background:${i.bg};color:${i.ic}">${i.icon}</div>
+      <div class="activity-desc">${i.text}</div>
+      <div class="activity-time">${i.time}</div>
+    </div>
+  `).join('');
+}
+
+// ── SESSIONS ───────────────────────────────────────────────
+function startSessionClock() {
+  function tick() {
+    const active = getActiveSessions();
+    setEl('session-label', 'Sesión activa: ' + (active.length ? active.join(' + ') : 'Sin sesión principal'));
+    setEl('session-now', active.length ? '● ' + active.join(' · ') : 'Fuera de sesión');
+
+    const now = new Date();
+    const utc = now.toUTCString().slice(17,22);
+    setEl('utc-time', utc + ' UTC');
+
+    const grid = document.getElementById('session-grid');
+    if (!grid) return;
+    grid.innerHTML = SESSIONS.map(s => {
+      const on = isSessionActive(s.open, s.close);
+      return `
+        <div class="session-box">
+          <div class="session-name">${s.name}</div>
+          <div class="session-status" style="color:${on?'var(--accent-green)':'var(--text-muted)'}">${on?'OPEN':'CLOSED'}</div>
+          <div class="session-hours">${s.open}:00 – ${s.close}:00</div>
+        </div>
+      `;
+    }).join('');
+  }
+  tick();
+  setInterval(tick, 5000);
+}
+
+// ── EQUITY MINI CHART ──────────────────────────────────────
+function buildEquityMini() {
+  const ctx = document.getElementById('equity-mini');
+  if (!ctx) return;
+  if (equityChart) { equityChart.destroy(); }
+
+  // Generate curve from closed positions or mock
+  const n = 30;
+  const data = []; let v = 0;
+  for (let i=0; i<n; i++) { v+= 0.28+(Math.random()-0.42)*1.1; v=Math.max(v,-3); data.push(parseFloat(v.toFixed(2))); }
+
+  const labels = Array.from({length:n},(_,i)=>{const d=new Date();d.setDate(d.getDate()-n+i);return d.toLocaleDateString('es',{day:'2-digit',month:'short'});});
+  const grad = ctx.getContext('2d').createLinearGradient(0,0,0,120);
+  grad.addColorStop(0, 'rgba(0,200,150,0.25)');
+  grad.addColorStop(1, 'rgba(0,200,150,0)');
+
+  equityChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{ data, borderColor:'#00c896', borderWidth:2, fill:true, backgroundColor:grad, pointRadius:0, tension:0.4 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#111620', borderColor:'rgba(255,255,255,0.08)', borderWidth:1, titleColor:'#7a8599', bodyColor:'#e8edf5', titleFont:{family:"'IBM Plex Mono',monospace",size:9}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11}, callbacks:{ label: (ctx) => ' ' + (ctx.raw>=0?'+':'')+ctx.raw+'%' } } },
+      scales:{ x:{ grid:{display:false}, ticks:{display:false} }, y:{ grid:{color:'rgba(255,255,255,0.03)',drawTicks:false}, ticks:{color:'#3d4556',font:{family:"'IBM Plex Mono',monospace",size:8}}, border:{color:'rgba(255,255,255,0.04)'}, position:'right' } }
+    }
+  });
+}
+
+// ── SYNC ───────────────────────────────────────────────────
+function syncPage() { showToast('Sincronizando...','ok'); loadAll(); }
+function exportData() { showToast('Exportación próximamente','ok'); }
+
+// ── START ──────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>

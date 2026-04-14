@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FXTE Operating System · Login</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+:root{
+  --bg-base:#080a0e;--bg-surface:#0d1117;--bg-card:#111620;
+  --border:rgba(255,255,255,0.06);--border-active:rgba(255,255,255,0.12);
+  --text-primary:#e8edf5;--text-secondary:#7a8599;--text-muted:#3d4556;
+  --accent-blue:#2d7ff9;--accent-blue-dim:rgba(45,127,249,0.12);
+  --accent-green:#00c896;--accent-green-dim:rgba(0,200,150,0.10);
+  --accent-amber:#f5a623;--accent-red:#f23645;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--bg-base);color:var(--text-primary);font-family:var(--sans);min-height:100vh;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(45,127,249,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(45,127,249,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(45,127,249,0.06) 0%,transparent 70%);pointer-events:none;z-index:0;}
+.login-wrap{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:28px;width:100%;max-width:420px;padding:20px;}
+.login-badge{font-family:var(--mono);font-size:9px;letter-spacing:0.2em;text-transform:uppercase;color:var(--text-muted);border:1px solid var(--border-active);padding:4px 12px;border-radius:20px;}
+.login-card{width:100%;background:var(--bg-card);border:1px solid var(--border-active);border-radius:10px;padding:32px 30px;box-shadow:0 40px 80px rgba(0,0,0,0.4);}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px;}
+.logo-glyph{width:34px;height:34px;border-radius:8px;background:var(--accent-blue-dim);border:1px solid var(--accent-blue);display:flex;align-items:center;justify-content:center;font-size:14px;}
+.logo-text{font-family:var(--mono);font-size:13px;font-weight:700;letter-spacing:0.12em;}
+.logo-sub{font-family:var(--mono);font-size:9px;color:var(--text-muted);letter-spacing:0.15em;text-transform:uppercase;margin-top:2px;}
+.login-title{font-family:var(--sans);font-size:20px;font-weight:300;margin-bottom:4px;}
+.login-title b{font-weight:600;color:var(--accent-blue);}
+.login-desc{font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-bottom:22px;}
+/* TABS */
+.tab-row{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0;}
+.tab{font-family:var(--mono);font-size:10px;letter-spacing:0.08em;padding:8px 16px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text-muted);transition:all 0.15s;text-transform:uppercase;}
+.tab:hover{color:var(--text-secondary);}
+.tab.active{color:var(--accent-blue);border-bottom-color:var(--accent-blue);}
+.tab-pane{display:none;}
+.tab-pane.active{display:block;}
+/* FORM */
+.form-field{margin-bottom:13px;}
+.form-label{display:block;font-family:var(--mono);font-size:9px;letter-spacing:0.12em;color:var(--text-muted);text-transform:uppercase;margin-bottom:5px;}
+.form-input{width:100%;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-family:var(--mono);font-size:12px;color:var(--text-primary);outline:none;transition:border-color 0.15s;}
+.form-input:focus{border-color:var(--accent-blue);}
+.form-input::placeholder{color:var(--text-muted);}
+.form-hint{font-family:var(--mono);font-size:9px;color:var(--text-muted);margin-top:4px;}
+.btn-primary{width:100%;padding:11px;background:var(--accent-blue-dim);border:1px solid var(--accent-blue);border-radius:4px;color:var(--accent-blue);font-family:var(--mono);font-size:11px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;margin-top:4px;}
+.btn-primary:hover{background:rgba(45,127,249,0.22);}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+/* DEMO CTA */
+.demo-cta{width:100%;padding:14px;background:var(--accent-green-dim);border:1px solid var(--accent-green);border-radius:6px;color:var(--accent-green);font-family:var(--sans);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-align:center;display:flex;align-items:center;justify-content:center;gap:8px;}
+.demo-cta:hover{background:rgba(0,200,150,0.18);box-shadow:0 0 20px rgba(0,200,150,0.15);}
+.demo-cta .demo-icon{font-size:16px;}
+.demo-desc{font-family:var(--mono);font-size:9px;color:var(--accent-green);text-align:center;margin-top:8px;opacity:0.7;}
+.form-error{font-family:var(--mono);font-size:10px;color:var(--accent-red);margin-top:10px;padding:8px 10px;background:rgba(242,54,69,0.08);border-radius:4px;display:none;}
+.form-loading{font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-top:10px;display:none;text-align:center;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent-blue);border-radius:50%;animation:spin 0.8s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px;}
+/* INFO BOX */
+.info-box{margin-top:16px;padding:10px 12px;background:var(--bg-surface);border:1px solid var(--border);border-radius:4px;}
+.info-row{display:flex;justify-content:space-between;padding:3px 0;}
+.info-key{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.info-val{font-family:var(--mono);font-size:9px;color:var(--text-secondary);}
+/* FOOTER */
+.login-footer{display:flex;justify-content:space-between;align-items:center;width:100%;}
+.login-footer-logo{font-family:var(--mono);font-size:9px;color:var(--text-muted);}
+.login-footer-links{display:flex;gap:14px;}
+.login-footer-links a{font-family:var(--mono);font-size:9px;color:var(--text-muted);text-decoration:none;}
+.login-footer-links a:hover{color:var(--text-secondary);}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+
+  <div class="login-badge">FXTE Operating System · v2.0</div>
+
+  <div class="login-card">
+    <!-- LOGO -->
+    <div class="login-logo">
+      <div class="logo-glyph">◈</div>
+      <div>
+        <div class="logo-text">FXTE · OS</div>
+        <div class="logo-sub">FX Pulse Pro Desk</div>
+      </div>
+    </div>
+
+    <div class="login-title">Acceso <b>Operacional</b></div>
+    <div class="login-desc">FX Pulse · FXTE PRO Desk Platform</div>
+
+    <!-- TABS -->
+    <div class="tab-row">
+      <div class="tab active" onclick="switchTab('demo',this)">Demo</div>
+      <div class="tab" onclick="switchTab('pipsend',this)">PipSend · Live</div>
+    </div>
+
+    <!-- TAB DEMO -->
+    <div class="tab-pane active" id="tab-demo">
+      <p style="font-family:var(--sans);font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">
+        Accede con datos simulados. Explora todos los módulos del sistema sin conexión al servidor de trading.
+      </p>
+      <button class="demo-cta" onclick="handleDemo()">
+        <span class="demo-icon">⬡</span>
+        Entrar en Modo Demo
+      </button>
+      <div class="demo-desc">Sin credenciales · Datos simulados · Acceso completo</div>
+    </div>
+
+    <!-- TAB PIPSEND -->
+    <div class="tab-pane" id="tab-pipsend">
+      <div class="form-field">
+        <label class="form-label">Número de cuenta (Login MT4/MT5)</label>
+        <input class="form-input" id="login-input" type="text"
+               placeholder="1201" autocomplete="username">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Contraseña</label>
+        <input class="form-input" id="pass-input" type="password"
+               placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Servidor (opcional)</label>
+        <input class="form-input" id="server-input" type="url"
+               placeholder="http://TU-IP:8080"
+               >
+        <div class="form-hint">URL de tu servidor PipSend · Ej: http://192.168.1.1:8080</div>
+      </div>
+      <button class="btn-primary" id="login-btn" onclick="handleLogin()">
+        Ingresar al Sistema
+      </button>
+      <div class="form-error" id="form-error"></div>
+      <div class="form-loading" id="form-loading">
+        <span class="spinner"></span>Verificando credenciales...
+      </div>
+      <div class="info-box">
+        <div class="info-row"><span class="info-key">Servidor</span><span class="info-val" id="srv-label">api.pipsend.com</span></div>
+        <div class="info-row"><span class="info-key">Estado</span><span class="info-val" style="color:var(--accent-blue)">Listo</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="login-footer">
+    <span class="login-footer-logo">fxpulse.org · FXTE PRO</span>
+    <div class="login-footer-links">
+      <a href="https://fxpulse.org">FX Pulse</a>
+      <a href="mailto:info@fxpulse.org">Soporte</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const APP = {
+  token: localStorage.getItem('fxte_token') || null,
+};
+if (APP.token) window.location.href = '/overview';
+
+const PIPSEND_DEFAULT = ''; // Set at login — SDK format: http://IP:PORT
+
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+async function handleDemo() {
+  const btn = document.querySelector('.demo-cta');
+  btn.textContent = '⟳ Cargando demo...';
+  btn.disabled = true;
+  localStorage.setItem('fxte_mode',    'demo');
+  localStorage.setItem('fxte_api_base', PIPSEND_DEFAULT + '/api/v1');
+  localStorage.setItem('fxte_token',   'mock_token_demo');
+  localStorage.setItem('fxte_refresh', 'mock_refresh');
+  localStorage.setItem('fxte_login',   '1201');
+  localStorage.setItem('fxte_account', JSON.stringify({
+    login:1201, balance:10500.75, equity:10850.25, margin:420.50,
+    trading_group:'FXTE PRO', first_name:'Operador', last_name:'Demo', initial:10000
+  }));
+  await new Promise(r=>setTimeout(r,600));
+  window.location.href = '/overview';
+}
+
+function setLoading(on) {
+  document.getElementById('login-btn').disabled = on;
+  document.getElementById('form-loading').style.display = on ? 'block':'none';
+  document.getElementById('form-error').style.display = 'none';
+}
+function showError(msg) {
+  const el = document.getElementById('form-error');
+  el.textContent = msg; el.style.display = 'block';
+  setLoading(false);
+}
+
+async function handleLogin() {
+  const loginVal  = document.getElementById('login-input').value.trim();
+  const passVal   = document.getElementById('pass-input').value.trim();
+  const serverVal = document.getElementById('server-input').value.trim() || PIPSEND_DEFAULT;
+
+  if (!loginVal) return showError('Ingresa tu número de cuenta.');
+  if (!passVal)  return showError('Ingresa tu contraseña.');
+
+  setLoading(true);
+  const base = serverVal.replace(/\/+$/,'').replace(/\/api\/v1$/,'');
+  localStorage.setItem('fxte_api_base', base + '/api/v1');
+  localStorage.removeItem('fxte_mode');
+
+  try {
+    const res = await fetch(base + '/api/v1/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({ login: String(loginVal), password: passVal })
+    });
+    const data = await res.json();
+    if (!res.ok || data.status === 'error') throw new Error(data.message || 'Credenciales incorrectas.');
+    localStorage.setItem('fxte_token',   data.access_token);
+    localStorage.setItem('fxte_refresh', data.refresh_token || '');
+    localStorage.setItem('fxte_login',   String(data.user?.login || loginVal));
+    localStorage.setItem('fxte_account', JSON.stringify(data.user || {}));
+    window.location.href = '/overview';
+  } catch(e) {
+    showError('Error: ' + (e.message || 'No se pudo conectar.'));
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key==='Enter') {
+    const active = document.querySelector('.tab-pane.active');
+    if (active?.id==='tab-pipsend') handleLogin();
+    else handleDemo();
+  }
+});
+
+window.addEventListener('load', () => {
+  const s = document.getElementById('server-input');
+  const apiBase = localStorage.getItem('fxte_api_base') || PIPSEND_DEFAULT + '/api/v1';
+  if (s) s.value = apiBase.replace('/api/v1','');
+  const lbl = document.getElementById('srv-label');
+  if (lbl) lbl.textContent = apiBase.replace('/api/v1','').replace('https://','');
+});
+</script>
+</body>
+</html>

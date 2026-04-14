@@ -1,0 +1,55 @@
+[[redirects]]
+  from  = "/"
+  to    = "/fxte.html"
+  status = 200
+
+[[redirects]]
+  from  = "/fxte"
+  to    = "/fxte.html"
+  status = 200
+
+[[redirects]]
+  from  = "/overview"
+  to    = "/overview.html"
+  status = 200
+
+[[redirects]]
+  from  = "/audit"
+  to    = "/audit.html"
+  status = 200
+
+[[redirects]]
+  from  = "/ranking"
+  to    = "/ranking.html"
+  status = 200
+
+[[redirects]]
+  from  = "/symbol"
+  to    = "/symbol.html"
+  status = 200
+
+[[redirects]]
+  from  = "/market"
+  to    = "/market.html"
+  status = 200
+
+[[redirects]]
+  from  = "/operation"
+  to    = "/operation.html"
+  status = 200
+
+[[redirects]]
+  from  = "/alert"
+  to    = "/alert.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+
+[[headers]]
+  for = "/shared.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
