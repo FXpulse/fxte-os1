@@ -1,20 +1,24 @@
 export default async function handler(req, res) {
-  const target = req.url.replace(/^\/api\/pipsend/, '');
-  const url = 'https://api.pipsend.com/api/v1' + (target || '');
+    // Path comes via query param ?_path= (set by vercel.json route)
+  const path = req.query?._path || '/';
+    const url  = 'https://api.pipsend.com/api/v1' + path;
 
   try {
-    const resp = await fetch(url, {
-      method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
-      },
-      body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
-    });
+        const headers = { 'Content-Type': 'application/json' };
+        if (req.headers.authorization) {
+                headers['Authorization'] = req.headers.authorization;
+        }
 
-    const data = await resp.json().catch(() => ({}));
-    res.status(resp.status).json(data);
+      const isReadOnly = ['GET', 'HEAD'].includes(req.method);
+        const body = isReadOnly ? undefined : JSON.stringify(req.body);
+
+      const resp = await fetch(url, { method: req.method, headers, body });
+        const text = await resp.text();
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Type', 'application/json');
+        res.status(resp.status).send(text);
   } catch (e) {
-    res.status(502).json({ error: 'Proxy error', message: e.message });
+        res.status(502).json({ error: 'Proxy error', message: e.message, url });
   }
 }
