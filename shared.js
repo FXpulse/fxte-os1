@@ -1,19 +1,19 @@
-// ═══════════════════════════════════════════════════════════
-// FXTE OS — SHARED CORE  (auth · api · router · ui)
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+// FXTE OS â SHARED CORE  (auth Â· api Â· router Â· ui)
 // PipSend REST + WebSocket integration
-// ═══════════════════════════════════════════════════════════
+// âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 
-// ── CONFIG (editable via Setup dialog) ────────────────────
+// ââ CONFIG (editable via Setup dialog) ââââââââââââââââââââ
 const FXTE_DEFAULTS = {
   PIPSEND_REAL:  'https://api.pipsend.com',         // Real PipSend server
   PROXY_BASE:    '/api/pipsend',                     // Vercel serverless proxy (solves CORS)
   API_VERSION:   '/api/v1',
-  TRADING_GROUP: 'FXTE PRO',                         // Exact group name in PipSend
+  TRADING_GROUP: 'Standard',                         // Exact group name in PipSend
   DEFAULT_LOGIN: '1201',                              // Default account
 };
 
 const FXTE_CONFIG = {
-  // Use the Vercel proxy as API_BASE — it forwards to api.pipsend.com
+  // Use the Vercel proxy as API_BASE â it forwards to api.pipsend.com
   get API_BASE() {
     const stored = localStorage.getItem('fxte_api_base');
     // If stored value is the real server, use proxy instead (avoids CORS)
@@ -31,7 +31,7 @@ const FXTE_CONFIG = {
   },
 };
 
-// ── APP STATE ─────────────────────────────────────────────
+// ââ APP STATE âââââââââââââââââââââââââââââââââââââââââââââ
 const APP = {
   token        : localStorage.getItem('fxte_token') || null,
   refreshToken : localStorage.getItem('fxte_refresh') || null,
@@ -57,10 +57,10 @@ function clearAuth() {
   if (APP.wsReconnectTimer) clearTimeout(APP.wsReconnectTimer);
 }
 
-// ── MOCK DATA ─────────────────────────────────────────────
+// ââ MOCK DATA âââââââââââââââââââââââââââââââââââââââââââââ
 const MOCK = {
   account: { login:1201, balance:10500.75, equity:10850.25, margin:420.50,
-             credit:0, free_margin:10080.25, trading_group:'FXTE PRO',
+             credit:0, free_margin:10080.25, trading_group:'Standard',
              first_name:'Operador', last_name:'Demo', initial:10000 },
   positions_open: [
     { id:1001, symbol:'XAUUSD', type:'buy',  volume:0.5, entry_price:2312.40, current_price:2318.80, profit:32.00, swap:-0.5, open_time:'2025-04-14T08:30:00Z' },
@@ -78,12 +78,12 @@ const MOCK = {
   stats: { total:47, wins:31, losses:16, profit:1284.50, loss:-610.25, maxDD:3.42,
            totalVolume:38.54, bestTrade:312.00, worstTrade:-187.50 },
   ranking: [
-    { login:1201,  name:'Operador Alpha', group:'FXTE PRO', balance:18400, profit_pct:8.42, win_rate:68.2, score:2.46, drawdown:2.10, trades:82 },
-    { login:1202,  name:'Trader Sierra',  group:'FXTE PRO', balance:11200, profit_pct:6.20, win_rate:62.5, score:1.98, drawdown:3.40, trades:55 },
-    { login:1203,  name:'Operador Kilo',  group:'FXTE PRO', balance:10850, profit_pct:5.05, win_rate:59.1, score:1.55, drawdown:3.42, trades:47 },
-    { login:1204,  name:'Trader Delta',   group:'FXTE PRO', balance:10600, profit_pct:3.80, win_rate:54.3, score:1.12, drawdown:4.10, trades:35 },
-    { login:1205,  name:'Operador Echo',  group:'FXTE PRO', balance:10200, profit_pct:1.50, win_rate:50.0, score:0.62, drawdown:5.20, trades:22 },
-    { login:1206,  name:'Trader Foxtrot', group:'FXTE PRO', balance:9850,  profit_pct:-1.20,win_rate:42.1, score:-0.20,drawdown:7.10, trades:19 },
+    { login:1201,  name:'Operador Alpha', group:'Standard', balance:18400, profit_pct:8.42, win_rate:68.2, score:2.46, drawdown:2.10, trades:82 },
+    { login:1202,  name:'Trader Sierra',  group:'Standard', balance:11200, profit_pct:6.20, win_rate:62.5, score:1.98, drawdown:3.40, trades:55 },
+    { login:1203,  name:'Operador Kilo',  group:'Standard', balance:10850, profit_pct:5.05, win_rate:59.1, score:1.55, drawdown:3.42, trades:47 },
+    { login:1204,  name:'Trader Delta',   group:'Standard', balance:10600, profit_pct:3.80, win_rate:54.3, score:1.12, drawdown:4.10, trades:35 },
+    { login:1205,  name:'Operador Echo',  group:'Standard', balance:10200, profit_pct:1.50, win_rate:50.0, score:0.62, drawdown:5.20, trades:22 },
+    { login:1206,  name:'Trader Foxtrot', group:'Standard', balance:9850,  profit_pct:-1.20,win_rate:42.1, score:-0.20,drawdown:7.10, trades:19 },
   ],
   market: [
     { symbol:'XAUUSD', price:2318.80, change:+0.42, bid:2318.70, ask:2318.90, session:'NY'  },
@@ -97,7 +97,7 @@ const MOCK = {
   ],
 };
 
-// ── API LAYER ─────────────────────────────────────────────
+// ââ API LAYER âââââââââââââââââââââââââââââââââââââââââââââ
 async function apiCall(endpoint, options = {}, retries = 3) {
   if (FXTE_CONFIG.USE_MOCK) {
     await new Promise(r => setTimeout(r, 150 + Math.random()*200));
@@ -123,7 +123,7 @@ async function apiCall(endpoint, options = {}, retries = 3) {
     API_TRACKER.track(endpoint, options.method || 'GET');
     API_TRACKER.recordHeaders(res.headers);
 
-    // Rate limit exceeded — wait and retry
+    // Rate limit exceeded â wait and retry
     if (res.status === 429) {
       const reset = res.headers.get('X-RateLimit-Reset');
       const wait  = reset ? Math.max(0, (parseInt(reset)*1000) - Date.now()) + 200 : 2000;
@@ -173,7 +173,7 @@ function getMockResponse(endpoint, opts={}) {
   return { status:'success', data: {} };
 }
 
-// ── AUTH ──────────────────────────────────────────────────
+// ââ AUTH ââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function doLogin(loginVal, passVal, serverUrl) {
   const server = serverUrl || FXTE_DEFAULTS.SERVER;
   const base = server.replace(/\/+$/, '').replace(/\/api\/v1$/, '');
@@ -234,7 +234,7 @@ function doLogout() {
   window.location.href = '/fxte';
 }
 
-// ── WEBSOCKET ─────────────────────────────────────────────
+// ââ WEBSOCKET âââââââââââââââââââââââââââââââââââââââââââââ
 function connectWebSocket(onMessage) {
   if (FXTE_CONFIG.USE_MOCK) {
     // Simulate live updates every 3s
@@ -285,17 +285,17 @@ function updateWSStatus(state) {
   const dot = document.getElementById('ws-dot');
   const lbl = document.getElementById('sb-api-status');
   const map = {
-    live:    { color: 'var(--accent-green)',  text: '● Live', textColor: 'var(--accent-green)' },
-    warn:    { color: 'var(--accent-amber)',  text: '● Warn', textColor: 'var(--accent-amber)' },
-    offline: { color: 'var(--accent-red)',    text: '● Off',  textColor: 'var(--accent-red)'   },
-    demo:    { color: 'var(--accent-amber)',  text: '● Demo', textColor: 'var(--accent-amber)' },
+    live:    { color: 'var(--accent-green)',  text: 'â Live', textColor: 'var(--accent-green)' },
+    warn:    { color: 'var(--accent-amber)',  text: 'â Warn', textColor: 'var(--accent-amber)' },
+    offline: { color: 'var(--accent-red)',    text: 'â Off',  textColor: 'var(--accent-red)'   },
+    demo:    { color: 'var(--accent-amber)',  text: 'â Demo', textColor: 'var(--accent-amber)' },
   };
   const s = map[state] || map.demo;
   if (dot) dot.style.background = s.color;
   if (lbl) { lbl.textContent = s.text; lbl.style.color = s.textColor; }
 }
 
-// ── GLOBAL CLOCK ──────────────────────────────────────────
+// ââ GLOBAL CLOCK ââââââââââââââââââââââââââââââââââââââââââ
 function startGlobalClock() {
   function tick() {
     const now = new Date();
@@ -309,7 +309,7 @@ function startGlobalClock() {
   setInterval(tick, 1000);
 }
 
-// ── SIDEBAR ACCOUNT ───────────────────────────────────────
+// ââ SIDEBAR ACCOUNT âââââââââââââââââââââââââââââââââââââââ
 function updateSidebarAccount(d) {
   // Handle both SDK event format (direct fields) and account object
   if (d && d.op === 'accounts:balance') {
@@ -325,13 +325,13 @@ function updateSidebarAccount(d) {
   set('sb-equity',  '$'+fmtNum(eq));
   set('sb-dd', dd.toFixed(2)+'%');
   set('sb-level', d.trading_group||'Level 1');
-  set('global-login', 'OP · ' + (APP.login||d.login||'—'));
+  set('global-login', 'OP Â· ' + (APP.login||d.login||'â'));
 
   const ddEl = document.getElementById('sb-dd');
   if (ddEl) ddEl.style.color = dd<6?'var(--accent-green)':dd<9?'var(--accent-amber)':'var(--accent-red)';
 }
 
-// ── TOAST ─────────────────────────────────────────────────
+// ââ TOAST âââââââââââââââââââââââââââââââââââââââââââââââââ
 function showToast(msg, type='ok') {
   const t = document.getElementById('toast');
   if (!t) return;
@@ -341,7 +341,7 @@ function showToast(msg, type='ok') {
   t._timer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// ── HELPERS ───────────────────────────────────────────────
+// ââ HELPERS âââââââââââââââââââââââââââââââââââââââââââââââ
 function fmtNum(n, d=2) {
   return parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
 }
@@ -363,7 +363,7 @@ function animVal(id, to, prefix='', suffix='', dec=2) {
   }, 18);
 }
 
-// ── PAGE GUARD ────────────────────────────────────────────
+// ââ PAGE GUARD ââââââââââââââââââââââââââââââââââââââââââââ
 function requireAuth() {
   if (!APP.token) {
     window.location.href = '/fxte';
@@ -372,7 +372,7 @@ function requireAuth() {
   return true;
 }
 
-// ── SESSIONS ─────────────────────────────────────────────
+// ââ SESSIONS âââââââââââââââââââââââââââââââââââââââââââââ
 const SESSIONS = [
   { name:'Sydney',   open:22, close:7  },
   { name:'Tokio',    open:0,  close:9  },
@@ -387,14 +387,14 @@ function getActiveSessions() {
   return SESSIONS.filter(s=>isSessionActive(s.open,s.close)).map(s=>s.name);
 }
 
-// ── ECONOMIC CALENDAR (ForexFactory proxy) ────────────────
+// ââ ECONOMIC CALENDAR (ForexFactory proxy) ââââââââââââââââ
 async function loadMacroEvents() {
   // Use ForexFactory JSON or Investing.com API
   // Fallback to static data
   return [
     { time:'08:30', name:'IPC EEUU (MoM)', currency:'USD', impact:'high',  countdown: calcCountdown(8,30) },
     { time:'10:00', name:'Confianza Consumidor', currency:'USD', impact:'med', countdown: calcCountdown(10,0) },
-    { time:'14:30', name:'Inventarios Petróleo EIA', currency:'OIL', impact:'med', countdown: calcCountdown(14,30) },
+    { time:'14:30', name:'Inventarios PetrÃ³leo EIA', currency:'OIL', impact:'med', countdown: calcCountdown(14,30) },
     { time:'18:00', name:'Actas FOMC', currency:'USD', impact:'high', countdown: calcCountdown(18,0) },
   ];
 }
@@ -408,20 +408,20 @@ function calcCountdown(h, m) {
   return hh + 'h ' + String(mm).padStart(2,'0') + 'm';
 }
 
-// ── SHARED SIDEBAR HTML ───────────────────────────────────
+// ââ SHARED SIDEBAR HTML âââââââââââââââââââââââââââââââââââ
 function getSidebarHTML(activePage) {
   const pages = [
-    { id:'overview',  icon:'◈', label:'Desk Overview',   href:'/overview' },
-    { id:'audit',     icon:'◎', label:'Execution Audit',  href:'/audit'    },
-    { id:'ranking',   icon:'▦', label:'Desk Ranking',     href:'/ranking'  },
-    { id:'symbol',    icon:'◐', label:'Symbol Desk',      href:'/symbol'   },
-    { id:'market',    icon:'◑', label:'Market Context',   href:'/market'   },
-    { id:'operation', icon:'▤', label:'Operation Log',    href:'/operation'},
-    { id:'alert',     icon:'◻', label:'Alerts',           href:'/alert',   badge:'—' },
+    { id:'overview',  icon:'â', label:'Desk Overview',   href:'/overview' },
+    { id:'audit',     icon:'â', label:'Execution Audit',  href:'/audit'    },
+    { id:'ranking',   icon:'â¦', label:'Desk Ranking',     href:'/ranking'  },
+    { id:'symbol',    icon:'â', label:'Symbol Desk',      href:'/symbol'   },
+    { id:'market',    icon:'â', label:'Market Context',   href:'/market'   },
+    { id:'operation', icon:'â¤', label:'Operation Log',    href:'/operation'},
+    { id:'alert',     icon:'â»', label:'Alerts',           href:'/alert',   badge:'â' },
   ];
   return `
     <div class="sidebar-section">
-      <div class="sidebar-label">Módulos</div>
+      <div class="sidebar-label">MÃ³dulos</div>
       ${pages.map(p=>`
         <a class="sidebar-item ${p.id===activePage?'active':''}" href="${p.href}" style="text-decoration:none">
           <span class="s-icon">${p.icon}</span>
@@ -441,22 +441,22 @@ function getSidebarHTML(activePage) {
         ].map(([l,id,c])=>`
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)">
             <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">${l}</span>
-            <span style="font-family:var(--mono);font-size:10px;color:${c};font-weight:500" id="${id}">—</span>
+            <span style="font-family:var(--mono);font-size:10px;color:${c};font-weight:500" id="${id}">â</span>
           </div>
         `).join('')}
         <div style="display:flex;justify-content:space-between;padding:5px 0">
           <span style="font-family:var(--mono);font-size:9px;color:var(--text-muted)">Pipsend</span>
-          <span style="font-family:var(--mono);font-size:9px" id="sb-api-status">—</span>
+          <span style="font-family:var(--mono);font-size:9px" id="sb-api-status">â</span>
         </div>
       </div>
     </div>
     <div class="sidebar-section" style="padding:0 16px;margin-top:auto">
-      <button class="btn" onclick="doLogout()" style="width:100%;font-size:9px;margin-top:8px">↩ Salir</button>
+      <button class="btn" onclick="doLogout()" style="width:100%;font-size:9px;margin-top:8px">â© Salir</button>
     </div>
   `;
 }
 
-// ── SHARED TOPBAR HTML ────────────────────────────────────
+// ââ SHARED TOPBAR HTML ââââââââââââââââââââââââââââââââââââ
 function getTopbarHTML(activePage) {
   const navItems = [
     { label:'Overview',  id:'overview',  href:'/overview'  },
@@ -471,7 +471,7 @@ function getTopbarHTML(activePage) {
     <div class="topbar-left">
       <div class="logo">
         <div class="logo-dot"></div>
-        <span>FXTE · OS</span>
+        <span>FXTE Â· OS</span>
       </div>
       <nav class="nav" id="main-nav">
         ${navItems.map(n=>`
@@ -480,17 +480,17 @@ function getTopbarHTML(activePage) {
       </nav>
     </div>
     <div class="topbar-right">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)" id="global-clock">—</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)" id="global-clock">â</div>
       <div class="account-tag">
         <div class="status-dot" id="ws-dot"></div>
-        <span class="login" id="global-login">—</span>
+        <span class="login" id="global-login">â</span>
       </div>
-      <button class="btn primary" onclick="syncPage()">↻ Sync</button>
+      <button class="btn primary" onclick="syncPage()">â» Sync</button>
     </div>
   `;
 }
 
-// ── SHARED CSS ────────────────────────────────────────────
+// ââ SHARED CSS ââââââââââââââââââââââââââââââââââââââââââââ
 const SHARED_CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -658,7 +658,7 @@ body{background:var(--bg-base);color:var(--text-primary);font-family:var(--sans)
 
 console.log('[FXTE OS] shared.js loaded');
 
-// ── USAGE TRACKER (PipSend: 100 req/min · 1000 req/hr) ─────
+// ââ USAGE TRACKER (PipSend: 100 req/min Â· 1000 req/hr) âââââ
 class UsageTracker {
   constructor() { this.requests = []; this.rateLimitInfo = {}; }
 
@@ -683,7 +683,7 @@ class UsageTracker {
     const pct = Math.round((remaining / limit) * 100);
     const color = pct > 50 ? 'var(--accent-green)' : pct > 20 ? 'var(--accent-amber)' : 'var(--accent-red)';
     const el = document.getElementById('sb-api-status');
-    if (el) { el.textContent = `● ${remaining}/${limit}`; el.style.color = color; }
+    if (el) { el.textContent = `â ${remaining}/${limit}`; el.style.color = color; }
   }
 
   getStats() {
