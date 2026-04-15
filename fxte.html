@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FXTE Operating System · Login</title>
+<title>FXTE Operating System Â· Login</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
 :root{
@@ -71,58 +71,47 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <body>
 <div class="login-wrap">
 
-  <div class="login-badge">FXTE Operating System · v2.0</div>
+  <div class="login-badge">FXTE Operating System Â· v2.0</div>
 
   <div class="login-card">
     <!-- LOGO -->
     <div class="login-logo">
-      <div class="logo-glyph">◈</div>
+      <div class="logo-glyph">â</div>
       <div>
-        <div class="logo-text">FXTE · OS</div>
+        <div class="logo-text">FXTE Â· OS</div>
         <div class="logo-sub">FX Pulse Pro Desk</div>
       </div>
     </div>
 
     <div class="login-title">Acceso <b>Operacional</b></div>
-    <div class="login-desc">FX Pulse · FXTE PRO Desk Platform</div>
+    <div class="login-desc">FX Pulse Â· FXTE PRO Desk Platform</div>
 
     <!-- TABS -->
     <div class="tab-row">
       <div class="tab active" onclick="switchTab('demo',this)">Demo</div>
-      <div class="tab" onclick="switchTab('pipsend',this)">PipSend · Live</div>
+      <div class="tab" onclick="switchTab('pipsend',this)">PipSend Â· Live</div>
     </div>
 
     <!-- TAB DEMO -->
     <div class="tab-pane active" id="tab-demo">
       <p style="font-family:var(--sans);font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:16px">
-        Accede con datos simulados. Explora todos los módulos del sistema sin conexión al servidor de trading.
+        Accede con datos simulados. Explora todos los mÃ³dulos del sistema sin conexiÃ³n al servidor de trading.
       </p>
       <button class="demo-cta" onclick="handleDemo()">
-        <span class="demo-icon">⬡</span>
+        <span class="demo-icon">â¬¡</span>
         Entrar en Modo Demo
       </button>
-      <div class="demo-desc">Sin credenciales · Datos simulados · Acceso completo</div>
+      <div class="demo-desc">Sin credenciales Â· Datos simulados Â· Acceso completo</div>
     </div>
 
     <!-- TAB PIPSEND -->
     <div class="tab-pane" id="tab-pipsend">
       <div class="form-field">
-        <label class="form-label">Número de cuenta (Login MT4/MT5)</label>
+        <label class="form-label">NÃºmero de cuenta (Login MT4/MT5)</label>
         <input class="form-input" id="login-input" type="text"
                placeholder="1201" autocomplete="username">
       </div>
-      <div class="form-field">
-        <label class="form-label">Contraseña</label>
-        <input class="form-input" id="pass-input" type="password"
-               placeholder="••••••••" autocomplete="current-password">
-      </div>
-      <div class="form-field">
-        <label class="form-label">Servidor (opcional)</label>
-        <input class="form-input" id="server-input" type="url"
-               placeholder="http://TU-IP:8080"
-               >
-        <div class="form-hint">URL de tu servidor PipSend · Ej: http://192.168.1.1:8080</div>
-      </div>
+            <div class="form-hint" style="color:var(--accent-blue);margin:8px 0 16px">Acceso verificado por número de cuenta.</div>
       <button class="btn-primary" id="login-btn" onclick="handleLogin()">
         Ingresar al Sistema
       </button>
@@ -139,7 +128,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   </div>
 
   <div class="login-footer">
-    <span class="login-footer-logo">fxpulse.org · FXTE PRO</span>
+    <span class="login-footer-logo">fxpulse.org Â· FXTE PRO</span>
     <div class="login-footer-links">
       <a href="https://fxpulse.org">FX Pulse</a>
       <a href="mailto:info@fxpulse.org">Soporte</a>
@@ -154,7 +143,7 @@ const APP = {
 };
 if (APP.token) window.location.href = '/overview';
 
-const PIPSEND_DEFAULT = ''; // Set at login — SDK format: http://IP:PORT
+const PIPSEND_DEFAULT = ''; // Set at login â SDK format: http://IP:PORT
 
 function switchTab(name, el) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -165,7 +154,7 @@ function switchTab(name, el) {
 
 async function handleDemo() {
   const btn = document.querySelector('.demo-cta');
-  btn.textContent = '⟳ Cargando demo...';
+  btn.textContent = 'â³ Cargando demo...';
   btn.disabled = true;
   localStorage.setItem('fxte_mode',    'demo');
   localStorage.setItem('fxte_api_base', PIPSEND_DEFAULT + '/api/v1');
@@ -193,11 +182,11 @@ function showError(msg) {
 
 async function handleLogin() {
   const loginVal  = document.getElementById('login-input').value.trim();
-  const passVal   = document.getElementById('pass-input').value.trim();
-  const serverVal = document.getElementById('server-input').value.trim() || PIPSEND_DEFAULT;
+  const passVal   = '');
+  const serverVal = '') || PIPSEND_DEFAULT;
 
-  if (!loginVal) return showError('Ingresa tu número de cuenta.');
-  if (!passVal)  return showError('Ingresa tu contraseña.');
+  if (!loginVal) return showError('Ingresa tu nÃºmero de cuenta.');
+  if (!passVal)  return showError('Ingresa tu contraseÃ±a.');
 
   setLoading(true);
   const base = serverVal.replace(/\/+$/,'').replace(/\/api\/v1$/,'');
